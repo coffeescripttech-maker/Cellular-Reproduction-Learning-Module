@@ -1,0 +1,14 @@
+# Ignore test pages during Vercel build
+app/test-*
+app/demo
+
+# Ignore test files
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Ignore development files
+*.log
+.DS_Store
