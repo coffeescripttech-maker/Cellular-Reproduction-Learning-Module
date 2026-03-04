@@ -6,6 +6,12 @@ const supabaseUrl = config.supabase.url;
 const supabaseAnonKey = config.supabase.anonKey;
 const serviceRoleKey = config.supabase.serviceRoleKey;
 
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('⚠️ Supabase credentials not found. Some features may not work.');
+  console.warn('Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in environment variables.');
+}
+
 // Singleton pattern to prevent multiple client instances
 // This prevents "Multiple GoTrueClient instances" warning
 let _supabaseClient: SupabaseClient<Database> | null = null;
@@ -13,8 +19,14 @@ let _supabaseAdminClient: SupabaseClient<Database> | null = null;
 
 /**
  * Get or create the main Supabase client instance (singleton)
+ * Returns null if credentials are not available
  */
-function getSupabaseClient() {
+function getSupabaseClient(): SupabaseClient<Database> | null {
+  // Return null if credentials are missing
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
   if (!_supabaseClient) {
     _supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -30,15 +42,19 @@ function getSupabaseClient() {
 
 /**
  * Get or create the admin Supabase client instance (singleton)
+ * Returns null if credentials are not available
  */
-function getSupabaseAdminClient() {
+function getSupabaseAdminClient(): SupabaseClient<Database> | null {
+  // Return null if credentials are missing
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
   if (!_supabaseAdminClient) {
     // Validate that we have a service role key (not anon key)
-    if (!serviceRoleKey || serviceRoleKey === supabaseAnonKey) {
+    if (serviceRoleKey === supabaseAnonKey) {
       console.error('⚠️ WARNING: Admin client is using anon key instead of service role key!');
       console.error('This will cause "User not allowed" errors for admin operations.');
-    } else {
-      console.log('✅ Admin client initialized with service role key');
     }
 
     _supabaseAdminClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
@@ -53,12 +69,16 @@ function getSupabaseAdminClient() {
   return _supabaseAdminClient;
 }
 
-// Export singleton instances
+// Export singleton instances (may be null if credentials missing)
 export const supabase = getSupabaseClient();
 export const supabaseAdmin = getSupabaseAdminClient();
 
 // Server-side client for API routes (creates new instance each time)
-export const createServerSupabaseClient = () => {
+export const createServerSupabaseClient = (): SupabaseClient<Database> | null => {
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
