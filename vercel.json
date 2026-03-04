@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm run build:clean",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build:clean",
   "headers": [
     {
       "source": "/(.*)",
