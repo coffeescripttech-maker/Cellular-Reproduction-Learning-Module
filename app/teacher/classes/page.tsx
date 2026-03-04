@@ -24,7 +24,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { ClassesAPI } from '@/lib/api/classes';
+import { ClassesAPI } from '@/lib/api/unified-api';
 import { Class, CreateClassData, UpdateClassData } from '@/types/class';
 import {
   ClassFormModal,

@@ -14,8 +14,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { VARKModulesAPI } from '@/lib/api/unified-api';
-import { ClassesAPI } from '@/lib/api/classes';
+import { VARKModulesAPI, ClassesAPI } from '@/lib/api/unified-api';
 import {
   type VARKModule,
   type VARKModuleCategory,
