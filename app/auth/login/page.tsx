@@ -184,7 +184,7 @@ export default function LoginPage() {
                   <BookOpen className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">BISCAS NAGA</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Cellular Reproduction Learning Module</h1>
                   <p className="text-sm text-gray-600">Learning Module System</p>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export default function LoginPage() {
           {/* Right Side - Login Form */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
             {/* Mobile Logo */}
-            <div className="lg:hidden text-center mb-8 animate-fade-in">
+            {/* <div className="lg:hidden text-center mb-8 animate-fade-in">
               <div className="flex items-center justify-center mb-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-[#00af8f] to-teal-600 rounded-2xl flex items-center justify-center shadow-2xl">
                   <BookOpen className="w-8 h-8 text-white" />
@@ -239,7 +239,7 @@ export default function LoginPage() {
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">BISCAS NAGA</h1>
               <p className="text-gray-600">Learning Module System</p>
-            </div>
+            </div> */}
 
             {/* Login Card */}
             <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md group hover:shadow-3xl transition-all duration-500 animate-slide-up">

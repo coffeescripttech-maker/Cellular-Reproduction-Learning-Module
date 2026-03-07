@@ -215,38 +215,58 @@ export default function TeacherSubmissionsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00af8f]"></div>
+      <div className="min-h-screen bg-gradient-to-br from-[#feffff] via-[#ffffff] to-[#feffff] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#00af8f]" />
+          <p className="text-lg text-gray-600">Loading submissions data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Student Submissions
-          </h1>
-          <p className="text-gray-600">
-            View and manage student module completions
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-[#feffff] via-[#ffffff] to-[#feffff]">
+      {/* Enhanced Header */}
+      <div className="bg-white shadow-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#00af8f] to-[#00af90] rounded-xl flex items-center justify-center shadow-lg">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Student Submissions
+                </h1>
+                <p className="text-gray-600">
+                  Track and analyze student module completions
+                </p>
+              </div>
+            </div>
+            <Button 
+              onClick={downloadReport} 
+              className="bg-gradient-to-r from-[#00af8f] to-[#00af90] hover:from-[#00af90] hover:to-[#00af8f] text-white border-0 shadow-lg">
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
         </div>
-        <Button 
-          onClick={downloadReport} 
-          variant="outline"
-          className="border-2 border-[#00af8f] text-[#00af8f] hover:bg-[#00af8f] hover:text-white">
-          <Download className="w-4 h-4 mr-2" />
-          Export Report
-        </Button>
       </div>
 
-      {/* Search and Filters */}
-      <Card className="border-0 shadow-lg">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+      {/* Enhanced Search and Filters */}
+      <Card className="border-0 shadow-lg bg-white">
         <CardContent className="p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+              <Filter className="w-5 h-5 mr-2 text-[#00af8f]" />
+              Filter & Search
+            </h3>
+            <p className="text-sm text-gray-600">
+              Find specific students or filter by module
+            </p>
+          </div>
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -255,17 +275,21 @@ export default function TeacherSubmissionsPage() {
                   placeholder="Search students by name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 border-gray-300 focus:border-[#00af8f] focus:ring-[#00af8f]"
                 />
               </div>
             </div>
             <Select value={selectedModule} onValueChange={setSelectedModule}>
-              <SelectTrigger className="w-full md:w-64">
-                <Filter className="w-4 h-4 mr-2" />
+              <SelectTrigger className="w-full lg:w-80 border-gray-300 focus:border-[#00af8f] focus:ring-[#00af8f]">
                 <SelectValue placeholder="Filter by module" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Modules</SelectItem>
+                <SelectItem value="all">
+                  <div className="flex items-center">
+                    <FileText className="w-4 h-4 mr-2" />
+                    All Modules
+                  </div>
+                </SelectItem>
                 {modules.map((module) => (
                   <SelectItem key={module.id} value={module.id}>
                     {module.title}
@@ -280,100 +304,114 @@ export default function TeacherSubmissionsPage() {
       {/* Module Overview Cards (when all modules selected) */}
       {selectedModule === 'all' && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Module Overview
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {submissions.map((submission) => (
-              <Card
-                key={submission.module_id}
-                className="border-0 shadow-lg hover:shadow-xl transition-all cursor-pointer group"
-                onClick={() => setSelectedModule(submission.module_id)}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-1 group-hover:text-[#00af8f] transition-colors">
-                        {submission.module_title}
-                      </h3>
-                      <Badge
-                        className={`${
-                          submission.completion_rate >= 80
-                            ? 'bg-green-100 text-green-800'
-                            : submission.completion_rate >= 50
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                        {Number(submission.completion_rate || 0).toFixed(1)}% Complete
-                      </Badge>
-                    </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#00af8f] to-[#00af90] rounded-xl flex items-center justify-center shadow-lg">
-                      <FileText className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 flex items-center">
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Completed
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        {submission.submitted_count || 0} / {submission.total_students || 0}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 flex items-center">
-                        <Trophy className="w-4 h-4 mr-2" />
-                        Avg Score
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        {Number(submission.average_score || 0).toFixed(1)}%
-                      </span>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Completion Rate</span>
-                        <span>{Number(submission.completion_rate || 0).toFixed(1)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${
-                            submission.completion_rate >= 80
-                              ? 'bg-green-500'
-                              : submission.completion_rate >= 50
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${submission.completion_rate || 0}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* <div className="pt-2">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Progress</span>
-                        <span>{submission.completion_rate}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${
-                            submission.completion_rate >= 80
-                              ? 'bg-green-500'
-                              : submission.completion_rate >= 50
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${submission.completion_rate}%` }}
-                        />
-                      </div>
-                    </div> */}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <BarChart3 className="w-5 h-5 mr-2 text-[#00af8f]" />
+                Module Overview
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {submissions.length} module{submissions.length !== 1 ? 's' : ''} with submissions
+              </p>
+            </div>
           </div>
+          
+          {submissions.length === 0 ? (
+            <Card className="border-0 shadow-lg">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No submissions yet
+                  </h3>
+                  <p className="text-gray-600">
+                    Students haven't completed any modules yet.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {submissions.map((submission) => (
+                <Card
+                  key={submission.module_id}
+                  className="border-0 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden"
+                  onClick={() => setSelectedModule(submission.module_id)}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#00af8f]/10 to-transparent rounded-bl-full" />
+                  <CardContent className="p-6 relative">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-[#00af8f] transition-colors line-clamp-2">
+                          {submission.module_title}
+                        </h3>
+                        <Badge
+                          className={`${
+                            submission.completion_rate >= 80
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : submission.completion_rate >= 50
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              : 'bg-red-100 text-red-800 border-red-200'
+                          } border`}>
+                          {Number(submission.completion_rate || 0).toFixed(0)}% Complete
+                        </Badge>
+                      </div>
+                      <div className="w-14 h-14 bg-gradient-to-br from-[#00af8f] to-[#00af90] rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <FileText className="w-7 h-7 text-white" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="text-sm text-gray-600 flex items-center font-medium">
+                          <Users className="w-4 h-4 mr-2 text-blue-600" />
+                          Students
+                        </span>
+                        <span className="font-bold text-gray-900 text-lg">
+                          {submission.submitted_count || 0} / {submission.total_students || 0}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+                        <span className="text-sm text-gray-600 flex items-center font-medium">
+                          <Trophy className="w-4 h-4 mr-2 text-yellow-600" />
+                          Avg Score
+                        </span>
+                        <span className="font-bold text-gray-900 text-lg">
+                          {Number(submission.average_score || 0).toFixed(1)}%
+                        </span>
+                      </div>
+
+                      <div className="pt-2">
+                        <div className="flex justify-between text-xs text-gray-600 mb-2">
+                          <span className="font-medium">Completion Progress</span>
+                          <span className="font-bold">{Number(submission.completion_rate || 0).toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                          <div
+                            className={`h-3 rounded-full transition-all duration-500 ${
+                              submission.completion_rate >= 80
+                                ? 'bg-gradient-to-r from-green-500 to-green-600'
+                                : submission.completion_rate >= 50
+                                ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                                : 'bg-gradient-to-r from-red-500 to-red-600'
+                            }`}
+                            style={{ width: `${submission.completion_rate || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex items-center justify-center text-[#00af8f] group-hover:text-[#00af90] transition-colors">
+                        <span className="text-sm font-medium">View Details</span>
+                        <Target className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -382,18 +420,20 @@ export default function TeacherSubmissionsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <Award className="w-5 h-5 mr-2 text-[#00af8f]" />
                 {modules.find(m => m.id === selectedModule)?.title}
               </h2>
-              <p className="text-sm text-gray-600">
-                {filteredResults.length} student{filteredResults.length !== 1 ? 's' : ''} completed
+              <p className="text-sm text-gray-600 mt-1">
+                {filteredResults.length} student{filteredResults.length !== 1 ? 's' : ''} completed this module
               </p>
             </div>
             <Button
               onClick={() => setSelectedModule('all')}
               variant="outline"
-              size="sm">
-              ← Back to Overview
+              className="border-gray-300 hover:bg-gray-50">
+              <Target className="w-4 h-4 mr-2" />
+              Back to Overview
             </Button>
           </div>
 
@@ -401,9 +441,14 @@ export default function TeacherSubmissionsPage() {
             <Card className="border-0 shadow-lg">
               <CardContent className="py-12">
                 <div className="text-center">
-                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No submissions found
+                  </h3>
                   <p className="text-gray-600">
-                    No submissions found for this module.
+                    {searchTerm 
+                      ? 'Try adjusting your search criteria.'
+                      : 'No students have completed this module yet.'}
                   </p>
                 </div>
               </CardContent>
@@ -413,93 +458,97 @@ export default function TeacherSubmissionsPage() {
               {filteredResults.map((result) => (
                 <Card
                   key={`${result.student_id}-${result.module_id}`}
-                  className="border-0 shadow-lg hover:shadow-xl transition-all">
+                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
                   <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4 mb-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                              {result.student_name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-lg text-gray-900">
-                                {result.student_name}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                {result.student_email}
-                              </p>
-                            </div>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4 mb-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                            {result.student_name.charAt(0).toUpperCase()}
                           </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">
-                                Final Score
-                              </p>
-                              <div className="flex items-center space-x-2">
-                                <Trophy
-                                  className={`w-4 h-4 ${
-                                    result.final_score >= 90
-                                      ? 'text-green-600'
-                                      : result.final_score >= 80
-                                      ? 'text-blue-600'
-                                      : 'text-yellow-600'
-                                  }`}
-                                />
-                                <span className="font-bold text-lg">
-                                  {result.final_score}%
-                                </span>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">
-                                Time Spent
-                              </p>
-                              <div className="flex items-center space-x-2">
-                                <Clock className="w-4 h-4 text-gray-400" />
-                                <span className="font-semibold">
-                                  {Math.floor(result.time_spent_minutes / 60) > 0
-                                    ? `${Math.floor(result.time_spent_minutes / 60)}h ${result.time_spent_minutes % 60}m`
-                                    : `${result.time_spent_minutes}m`}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">
-                                Sections
-                              </p>
-                              <div className="flex items-center space-x-2">
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                <span className="font-semibold">
-                                  {result.sections_completed}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">
-                                Completed On
-                              </p>
-                              <div className="flex items-center space-x-2">
-                                <Calendar className="w-4 h-4 text-gray-400" />
-                                <span className="font-semibold text-sm">
-                                  {new Date(result.completion_date).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
+                          <div>
+                            <h3 className="font-semibold text-lg text-gray-900">
+                              {result.student_name}
+                            </h3>
+                            <p className="text-sm text-gray-600 flex items-center">
+                              <Users className="w-3 h-3 mr-1" />
+                              {result.student_email}
+                            </p>
                           </div>
                         </div>
 
-                        <Button
-                          onClick={() =>
-                            handleViewDetails(result.student_id, result.module_id)
-                          }
-                          className="ml-4 bg-gradient-to-r from-[#00af8f] to-[#00af90] hover:from-[#00af90] hover:to-[#00af8f] text-white border-0">
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </Button>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-green-200">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">
+                              Final Score
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Trophy
+                                className={`w-5 h-5 ${
+                                  result.final_score >= 90
+                                    ? 'text-green-600'
+                                    : result.final_score >= 80
+                                    ? 'text-blue-600'
+                                    : 'text-yellow-600'
+                                }`}
+                              />
+                              <span className="font-bold text-xl text-gray-900">
+                                {result.final_score}%
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">
+                              Time Spent
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Clock className="w-5 h-5 text-blue-600" />
+                              <span className="font-bold text-lg text-gray-900">
+                                {Math.floor(result.time_spent_minutes / 60) > 0
+                                  ? `${Math.floor(result.time_spent_minutes / 60)}h ${result.time_spent_minutes % 60}m`
+                                  : `${result.time_spent_minutes}m`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-lg border border-purple-200">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">
+                              Sections
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="w-5 h-5 text-purple-600" />
+                              <span className="font-bold text-lg text-gray-900">
+                                {result.sections_completed}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-lg border border-orange-200">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">
+                              Completed
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="w-5 h-5 text-orange-600" />
+                              <span className="font-bold text-sm text-gray-900">
+                                {new Date(result.completion_date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() =>
+                          handleViewDetails(result.student_id, result.module_id)
+                        }
+                        className="lg:ml-4 bg-gradient-to-r from-[#00af8f] to-[#00af90] hover:from-[#00af90] hover:to-[#00af8f] text-white border-0 shadow-lg group-hover:shadow-xl transition-all">
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -666,6 +715,7 @@ export default function TeacherSubmissionsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
