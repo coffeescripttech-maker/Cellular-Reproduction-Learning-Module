@@ -581,6 +581,20 @@ export default function TeacherSubmissionsPage() {
                         <Eye className="w-4 h-4 mr-2" />
                         View Details
                       </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedStudentData({
+                            student: result,
+                            module: modules.find(m => m.id === result.module_id)
+                          });
+                          setShowResetConfirm(true);
+                        }}
+                        variant="outline"
+                        className="lg:ml-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400">
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Reset
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
