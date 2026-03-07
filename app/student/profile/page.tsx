@@ -288,7 +288,7 @@ export default function StudentProfilePage() {
                       {(user as any)?.learningType || 'Unimodal'}
                       <span className="text-gray-600"> Learner</span>
                     </h3>
-                    <p className="text-gray-600">
+                    <div className="text-gray-600">
                       {(user as any)?.preferredModules && (user as any).preferredModules.length > 0 ? (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {(user as any).preferredModules.map((module: string, idx: number) => (
@@ -303,7 +303,7 @@ export default function StudentProfilePage() {
                       ) : (
                         <span>Your unique learning profile</span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">

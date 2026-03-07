@@ -117,7 +117,6 @@ export default function StudentVARKModulesPage() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLearningStyle, setSelectedLearningStyle] = useState('all');
@@ -125,6 +124,7 @@ export default function StudentVARKModulesPage() {
   const [viewMode, setViewMode] = useState<
     'all' | 'recommended' | 'in-progress' | 'completed'
   >('all');
+  const [sortBy, setSortBy] = useState<'title-asc' | 'title-desc' | 'difficulty-asc' | 'difficulty-desc' | 'progress-desc' | 'progress-asc'>('title-asc');
   const [bookmarkedModules, setBookmarkedModules] = useState<string[]>([]);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [selectedModuleForResults, setSelectedModuleForResults] = useState<
@@ -420,9 +420,6 @@ export default function StudentVARKModulesPage() {
       module.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       module.description.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesSubject =
-      selectedSubject === 'all' || module.category?.subject === selectedSubject;
-
     const matchesDifficulty =
       selectedDifficulty === 'all' ||
       module.difficulty_level === selectedDifficulty;
@@ -456,13 +453,34 @@ export default function StudentVARKModulesPage() {
 
     return (
       matchesSearch &&
-      matchesSubject &&
       matchesDifficulty &&
       matchesCategory &&
       matchesLearningStyle &&
       matchesClass &&
       matchesViewMode
     );
+  }).sort((a, b) => {
+    // Apply sorting
+    const difficultyOrder = { beginner: 1, intermediate: 2, advanced: 3 };
+    
+    switch (sortBy) {
+      case 'title-asc':
+        return a.title.localeCompare(b.title);
+      case 'title-desc':
+        return b.title.localeCompare(a.title);
+      case 'difficulty-asc':
+        return (difficultyOrder[a.difficulty_level as keyof typeof difficultyOrder] || 0) - 
+               (difficultyOrder[b.difficulty_level as keyof typeof difficultyOrder] || 0);
+      case 'difficulty-desc':
+        return (difficultyOrder[b.difficulty_level as keyof typeof difficultyOrder] || 0) - 
+               (difficultyOrder[a.difficulty_level as keyof typeof difficultyOrder] || 0);
+      case 'progress-desc':
+        return getModuleProgress(b.id) - getModuleProgress(a.id);
+      case 'progress-asc':
+        return getModuleProgress(a.id) - getModuleProgress(b.id);
+      default:
+        return 0;
+    }
   });
 
   const subjects = Array.from(new Set(categories.map(cat => cat.subject)));
@@ -605,7 +623,7 @@ export default function StudentVARKModulesPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Search Input */}
             <div className="lg:col-span-2">
               <div className="relative">
@@ -619,71 +637,28 @@ export default function StudentVARKModulesPage() {
               </div>
             </div>
 
-            {/* Subject Filter */}
+            {/* Sort By */}
             <div>
               <Select
-                value={selectedSubject}
-                onValueChange={setSelectedSubject}>
+                value={sortBy}
+                onValueChange={(value: any) => setSortBy(value)}>
                 <SelectTrigger className="border-gray-300 focus:border-[#00af8f] focus:ring-[#00af8f]">
-                  <SelectValue placeholder="All Subjects" />
+                  <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
-                  {subjects.map(subject => (
-                    <SelectItem key={subject} value={subject}>
-                      {subject}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+                  <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+                  <SelectItem value="difficulty-asc">Difficulty (Easy First)</SelectItem>
+                  <SelectItem value="difficulty-desc">Difficulty (Hard First)</SelectItem>
+                  <SelectItem value="progress-desc">Progress (High to Low)</SelectItem>
+                  <SelectItem value="progress-asc">Progress (Low to High)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Learning Style Filter */}
-            {/* <div>
-              <Select
-                value={selectedLearningStyle}
-                onValueChange={setSelectedLearningStyle}>
-                <SelectTrigger className="border-gray-300 focus:border-[#00af8f] focus:ring-[#00af8f]">
-                  <SelectValue placeholder="All Styles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Learning Styles</SelectItem>
-                  {learningStyles.map(style => (
-                    <SelectItem key={style} value={style}>
-                      {
-                        learningStyleLabels[
-                          style as keyof typeof learningStyleLabels
-                        ]
-                      }
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
-
-            {/* Difficulty Filter */}
-            {/* <div>
-              <Select
-                value={selectedDifficulty}
-                onValueChange={setSelectedDifficulty}>
-                <SelectTrigger className="border-gray-300 focus:border-[#00af8f] focus:ring-[#00af8f]">
-                  <SelectValue placeholder="All Levels" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  {difficultyLevels.map(level => (
-                    <SelectItem key={level} value={level}>
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
           </div>
 
           {/* Active Filters Display */}
           {(searchTerm ||
-            selectedSubject !== 'all' ||
             selectedLearningStyle !== 'all' ||
             selectedDifficulty !== 'all') && (
             <div className="mt-4 pt-4 border-t border-gray-200">
@@ -697,13 +672,6 @@ export default function StudentVARKModulesPage() {
                       variant="secondary"
                       className="bg-blue-100 text-blue-800">
                       Search: "{searchTerm}"
-                    </Badge>
-                  )}
-                  {selectedSubject !== 'all' && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-800">
-                      Subject: {selectedSubject}
                     </Badge>
                   )}
                   {selectedLearningStyle !== 'all' && (
@@ -733,7 +701,6 @@ export default function StudentVARKModulesPage() {
                   size="sm"
                   onClick={() => {
                     setSearchTerm('');
-                    setSelectedSubject('all');
                     setSelectedLearningStyle('all');
                     setSelectedDifficulty('all');
                   }}
@@ -771,7 +738,6 @@ export default function StudentVARKModulesPage() {
                 variant="outline"
                 onClick={() => {
                   setSearchTerm('');
-                  setSelectedSubject('all');
                   setSelectedLearningStyle('all');
                   setSelectedDifficulty('all');
                 }}>

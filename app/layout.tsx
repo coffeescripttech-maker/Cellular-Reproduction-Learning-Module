@@ -5,6 +5,7 @@ import './main.css';
 import { ClientAuthProvider } from '@/components/providers/client-auth-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { PWAStatus } from '@/components/ui/pwa-status';
+import { Footer } from '@/components/ui/footer';
 
 export const metadata: Metadata = {
   title: 'Cellular Reproduction Learning Module',
@@ -73,9 +74,12 @@ html {
         <meta name="theme-color" content="#00af8f" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body>
+      <body className="flex flex-col min-h-screen">
         <ClientAuthProvider>
-          {children}
+          <div className="flex-1">
+            {children}
+          </div>
+          <Footer />
           <Toaster />
           <PWAStatus />
         </ClientAuthProvider>

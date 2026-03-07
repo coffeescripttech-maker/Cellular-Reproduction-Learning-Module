@@ -30,10 +30,11 @@ const registerSchema = z
     firstName: z.string().min(1, 'First name is required'),
     middleName: z.string().optional(),
     lastName: z.string().min(1, 'Last name is required'),
-    email: z.string().email('Please enter a valid email address'),
+    email: z.string().min(1, 'Email is required').email('Please enter a valid email address'),
     gradeLevel: z.string().optional(),
     password: z
       .string()
+      .min(1, 'Password is required')
       .min(8, 'Password must be at least 8 characters')
       .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
       .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
@@ -81,7 +82,8 @@ export default function RegisterPage() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      role: 'student'
+      role: 'student',
+      gradeLevel: 'Grade 7' // Default value for students
     },
     mode: 'onChange' // Enable real-time validation
   });
@@ -193,6 +195,22 @@ export default function RegisterPage() {
   };
 
   const onSubmit = async (data: RegisterFormData) => {
+    // Mark all fields as touched to show validation errors
+    setFirstNameTouched(true);
+    setLastNameTouched(true);
+    setEmailTouched(true);
+    setPasswordTouched(true);
+    setConfirmPasswordTouched(true);
+
+    // Trigger validation on all fields
+    const isValid = await trigger();
+    
+    // If validation fails, don't proceed
+    if (!isValid) {
+      setError('Please fill in all required fields correctly');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -239,7 +257,7 @@ export default function RegisterPage() {
         <div className="absolute top-1/2 right-1/3 w-2 h-2 bg-[#00af8f]/30 rounded-full animate-ping" style={{ animationDuration: '5s', animationDelay: '2s' }} />
       </div>
 
-      <div className="w-full max-w-6xl relative z-10 py-8">
+      <div className="w-full max-w-[1600px] relative z-10 py-8 px-4 xl:px-8">
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           {/* Left Side - Branding & Info */}
           <div className="hidden lg:block space-y-8 px-8">
@@ -257,8 +275,8 @@ export default function RegisterPage() {
                   <BookOpen className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">BISCAS NAGA</h1>
-                  <p className="text-sm text-gray-600">Learning Module System</p>
+                  <h1 className="text-3xl font-bold text-gray-900">Cellular Reproduction</h1>
+                  <p className="text-sm text-gray-600">Learning Module </p>
                 </div>
               </div>
               
@@ -305,7 +323,7 @@ export default function RegisterPage() {
           </div>
 
           {/* Right Side - Register Form */}
-          <div className="w-full max-w-md mx-auto lg:mx-0">
+          <div className="w-full max-w-2xl mx-auto lg:mx-0">
             {/* Mobile Header */}
             <div className="lg:hidden text-center mb-6 animate-fade-in">
               <Link
@@ -585,15 +603,19 @@ export default function RegisterPage() {
                       <Label
                         htmlFor="gradeLevel"
                         className="text-gray-900 font-semibold text-sm">
-                        Grade Level
+                        Grade Level *
                       </Label>
                       <Input
                         id="gradeLevel"
                         type="text"
-                        placeholder="e.g., Grade 6"
-                        className="h-11 text-base !border-2 !border-gray-200 focus:!border-[#00af8f] focus:ring-4 focus:ring-[#00af8f]/10 rounded-xl transition-all duration-300 hover:!border-[#00af8f]/50 hover:shadow-md"
+                        value="Grade 7"
+                        disabled
+                        className="h-11 text-base !border-2 !border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed rounded-xl"
                         {...register('gradeLevel')}
                       />
+                      <p className="text-xs text-gray-500 italic">
+                        Currently only Grade 7 students can register
+                      </p>
                     </div>
                   )}
 
@@ -770,7 +792,7 @@ export default function RegisterPage() {
 
                   <Button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || Object.keys(errors).length > 0}
                     className="w-full h-13 text-base font-bold text-white bg-gradient-to-r from-[#00af8f] via-[#00af90] to-teal-600 hover:from-teal-600 hover:via-[#00af90] hover:to-[#00af8f] shadow-xl transition-all duration-500 rounded-xl hover:shadow-2xl hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                     {isLoading ? (

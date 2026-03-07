@@ -85,10 +85,19 @@ export class ExpressVARKModulesAPI {
   private async fetchModuleContent(url: string): Promise<any> {
     try {
       console.log('📥 Fetching module content from:', url);
-      const response = await fetch(url);
+      
+      // Fetch with CORS mode
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json',
+        },
+        cache: 'no-cache'
+      });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch content: ${response.statusText}`);
+        throw new Error(`Failed to fetch content: ${response.status} ${response.statusText}`);
       }
       
       const content = await response.json();
@@ -96,7 +105,8 @@ export class ExpressVARKModulesAPI {
       return content;
     } catch (error) {
       console.error('❌ Error fetching module content:', error);
-      throw error;
+      // Return null instead of throwing to allow fallback to database content
+      return null;
     }
   }
 
@@ -117,10 +127,11 @@ export class ExpressVARKModulesAPI {
 
       // If module has json_content_url, fetch and merge the full content
       if (module.json_content_url) {
-        try {
-          console.log('📥 Module has json_content_url, fetching full content...');
-          const fullContent = await this.fetchModuleContent(module.json_content_url);
-          
+        console.log('📥 Module has json_content_url, fetching full content...');
+        const fullContent = await this.fetchModuleContent(module.json_content_url);
+        
+        // Only merge if fetch was successful
+        if (fullContent) {
           // Merge full content with database metadata
           // Database fields take precedence for metadata
           module = {
@@ -140,10 +151,8 @@ export class ExpressVARKModulesAPI {
           
           console.log('✅ Full module content merged from storage');
           console.log('📊 Content structure sections:', module.content_structure?.sections?.length || 0);
-        } catch (error) {
-          console.warn('⚠️ Failed to fetch module content from storage:', error);
-          console.log('📋 Using database content as fallback');
-          // Continue with database content if fetch fails
+        } else {
+          console.warn('⚠️ Failed to fetch module content from storage, using database content');
         }
       }
 
