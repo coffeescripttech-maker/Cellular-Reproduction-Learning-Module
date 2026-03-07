@@ -119,6 +119,67 @@ export default function StudentVARKModulePage() {
     }
   }, [moduleId, user]);
 
+  // Auto-save progress every 30 seconds
+  useEffect(() => {
+    if (!progress || !module || !user) return;
+    
+    const autoSaveInterval = setInterval(async () => {
+      try {
+        await UnifiedStudentProgressAPI.saveProgress({
+          studentId: user.id,
+          moduleId: module.id,
+          status: progress.status,
+          progressPercentage: progress.progress_percentage,
+          currentSectionId: progress.current_section_id,
+          timeSpentMinutes: progress.time_spent_minutes,
+          completedSections: progress.completed_sections,
+          assessmentScores: progress.assessment_scores
+        });
+        console.log('✅ Auto-save successful:', {
+          moduleId: module.id,
+          progress: progress.progress_percentage
+        });
+      } catch (error) {
+        console.error('❌ Auto-save failed:', error);
+      }
+    }, 30000); // Every 30 seconds
+    
+    return () => clearInterval(autoSaveInterval);
+  }, [progress, module, user]);
+
+  // Save progress before page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (progress && module && user) {
+        // Use synchronous localStorage as backup
+        const progressBackup = {
+          moduleId: module.id,
+          studentId: user.id,
+          progress: progress.progress_percentage,
+          completedSections: progress.completed_sections,
+          assessmentScores: progress.assessment_scores,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(`progress_${module.id}_${user.id}`, JSON.stringify(progressBackup));
+        
+        // Try to save to backend (may not complete before unload)
+        UnifiedStudentProgressAPI.saveProgress({
+          studentId: user.id,
+          moduleId: module.id,
+          status: progress.status,
+          progressPercentage: progress.progress_percentage,
+          currentSectionId: progress.current_section_id,
+          timeSpentMinutes: progress.time_spent_minutes,
+          completedSections: progress.completed_sections,
+          assessmentScores: progress.assessment_scores
+        }).catch(err => console.error('Save on unload failed:', err));
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [progress, module, user]);
+
   const loadModule = async () => {
     try {
       setLoading(true);
@@ -304,10 +365,16 @@ export default function StudentVARKModulePage() {
 
       // Load progress data from backend
       try {
+        console.log('🔍 === LOADING PROGRESS ===');
+        console.log('Student ID:', user!.id);
+        console.log('Module ID:', moduleId);
+        
         const progressData = await UnifiedStudentProgressAPI.getModuleProgress(
           user!.id,
           moduleId
         );
+
+        console.log('Progress data from backend:', progressData);
 
         if (progressData) {
           // Convert backend format to frontend format
@@ -325,25 +392,80 @@ export default function StudentVARKModulePage() {
             created_at: progressData.createdAt || new Date().toISOString(),
             updated_at: progressData.updatedAt || new Date().toISOString()
           };
+          console.log('✅ Progress loaded successfully:', {
+            percentage: frontendProgress.progress_percentage,
+            completedSections: frontendProgress.completed_sections.length,
+            status: frontendProgress.status
+          });
           setProgress(frontendProgress);
         } else {
-          // No progress yet - create initial progress state
-          const initialProgress: VARKModuleProgress = {
-            id: `progress-${moduleId}`,
-            module_id: moduleId,
-            student_id: user!.id,
-            status: 'not_started',
-            progress_percentage: 0,
-            current_section_id: moduleData.content_structure?.sections?.[0]?.id || '',
-            time_spent_minutes: 0,
-            completed_sections: [],
-            assessment_scores: {},
-            last_accessed_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          setProgress(initialProgress);
+          console.log('⚠️ No progress found in database, checking localStorage backup...');
+          
+          // Check localStorage for backup
+          const backupKey = `progress_${moduleId}_${user!.id}`;
+          const backupData = localStorage.getItem(backupKey);
+          
+          if (backupData) {
+            try {
+              const backup = JSON.parse(backupData);
+              console.log('📦 Found localStorage backup:', backup);
+              
+              // Create progress from backup
+              const restoredProgress: VARKModuleProgress = {
+                id: `progress-${moduleId}`,
+                module_id: moduleId,
+                student_id: user!.id,
+                status: backup.progress >= 100 ? 'completed' : backup.progress > 0 ? 'in_progress' : 'not_started',
+                progress_percentage: backup.progress || 0,
+                current_section_id: moduleData.content_structure?.sections?.[0]?.id || '',
+                time_spent_minutes: 0,
+                completed_sections: backup.completedSections || [],
+                assessment_scores: backup.assessmentScores || {},
+                last_accessed_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              setProgress(restoredProgress);
+              
+              // Save restored progress to backend
+              await UnifiedStudentProgressAPI.saveProgress({
+                studentId: user!.id,
+                moduleId: moduleId,
+                status: restoredProgress.status,
+                progressPercentage: restoredProgress.progress_percentage,
+                currentSectionId: restoredProgress.current_section_id,
+                timeSpentMinutes: restoredProgress.time_spent_minutes,
+                completedSections: restoredProgress.completed_sections,
+                assessmentScores: restoredProgress.assessment_scores
+              });
+              
+              console.log('✅ Progress restored from backup and saved to backend');
+              toast.success('Progress restored from backup');
+            } catch (err) {
+              console.error('Failed to restore from backup:', err);
+            }
+          } else {
+            console.log('ℹ️ No backup found, creating new progress');
+            // No progress yet - create initial progress state
+            const initialProgress: VARKModuleProgress = {
+              id: `progress-${moduleId}`,
+              module_id: moduleId,
+              student_id: user!.id,
+              status: 'not_started',
+              progress_percentage: 0,
+              current_section_id: moduleData.content_structure?.sections?.[0]?.id || '',
+              time_spent_minutes: 0,
+              completed_sections: [],
+              assessment_scores: {},
+              last_accessed_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setProgress(initialProgress);
+          }
         }
+        console.log('🔍 === END LOADING PROGRESS ===');
       } catch (error) {
         console.error('Error loading progress:', error);
         // Create default progress on error

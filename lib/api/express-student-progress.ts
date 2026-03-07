@@ -115,8 +115,9 @@ export class ExpressStudentProgressAPI {
       );
 
       if (response.error) {
-        // Return null if not found (404)
+        // Return null if not found (404) - this is expected for new modules
         if (response.error.code === 'DB_NOT_FOUND') {
+          console.log('ℹ️ No existing progress found for this module (this is normal for new modules)');
           return null;
         }
         
@@ -127,6 +128,12 @@ export class ExpressStudentProgressAPI {
       // Convert snake_case to camelCase
       return response.data ? toCamelCase(response.data) : null;
     } catch (error) {
+      // Suppress 404 errors in console - they're expected
+      if ((error as any)?.message?.includes('404') || (error as any)?.message?.includes('not found')) {
+        console.log('ℹ️ No existing progress found (404) - will create new progress record');
+        return null;
+      }
+      
       console.error('getModuleProgress error:', error);
       
       // Return null on error
@@ -240,6 +247,34 @@ export class ExpressStudentProgressAPI {
     } catch (error) {
       console.error('deleteProgress error:', error);
       return false;
+    }
+  }
+
+  /**
+   * Reset student progress for a module (deletes progress, completion, and submissions)
+   * 
+   * @param studentId - Student user ID
+   * @param moduleId - Module ID
+   * @returns Success status
+   */
+  static async resetStudentProgress(
+    studentId: string,
+    moduleId: string
+  ): Promise<boolean> {
+    try {
+      const response = await expressClient.delete(
+        `/api/progress/student/${studentId}/module/${moduleId}/reset`
+      );
+
+      if (response.error) {
+        console.error('Error resetting progress:', response.error);
+        throw new Error(response.error.message || 'Failed to reset progress');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('resetStudentProgress error:', error);
+      throw error;
     }
   }
 

@@ -22,6 +22,7 @@ import {
   DialogDescription
 } from '@/components/ui/dialog';
 import { VARKModulesAPI } from '@/lib/api/unified-api';
+import { ExpressStudentProgressAPI } from '@/lib/api/express-student-progress';
 import {
   FileText,
   Users,
@@ -41,7 +42,8 @@ import {
   TrendingUp,
   AlertCircle,
   Star,
-  Zap
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -78,6 +80,8 @@ export default function TeacherSubmissionsPage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedStudentData, setSelectedStudentData] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -190,6 +194,34 @@ export default function TeacherSubmissionsPage() {
       setShowDetailsModal(false);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleResetProgress = async () => {
+    if (!selectedStudentData) return;
+    
+    try {
+      setResetting(true);
+      
+      await ExpressStudentProgressAPI.resetStudentProgress(
+        selectedStudentData.student.student_id,
+        selectedStudentData.student.module_id
+      );
+      
+      toast.success('Student progress reset successfully');
+      setShowResetConfirm(false);
+      setShowDetailsModal(false);
+      
+      // Reload data
+      loadData();
+      if (selectedModule !== 'all') {
+        loadStudentResults(selectedModule);
+      }
+    } catch (error) {
+      console.error('Error resetting progress:', error);
+      toast.error('Failed to reset progress');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -711,8 +743,94 @@ export default function TeacherSubmissionsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Reset Progress Section */}
+              <Card className="border-red-200 bg-red-50">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center text-red-700">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    Danger Zone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-700 mb-4">
+                    Reset this student's progress for this module. This will delete:
+                  </p>
+                  <ul className="text-sm text-gray-700 mb-4 list-disc list-inside space-y-1">
+                    <li>All progress tracking data</li>
+                    <li>Module completion record</li>
+                    <li>All section submissions and scores</li>
+                  </ul>
+                  <p className="text-sm font-semibold text-red-700 mb-4">
+                    ⚠️ This action cannot be undone!
+                  </p>
+                  <Button
+                    onClick={() => setShowResetConfirm(true)}
+                    variant="destructive"
+                    className="w-full">
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset Student Progress
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Confirmation Dialog */}
+      <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700">
+              Confirm Progress Reset
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reset progress for{' '}
+              <strong>{selectedStudentData?.student?.student_name}</strong> in{' '}
+              <strong>{selectedStudentData?.module?.title}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 my-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800 font-semibold mb-2">
+                This will permanently delete:
+              </p>
+              <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                <li>Progress: {selectedStudentData?.completion?.progress_percentage || 0}%</li>
+                <li>Score: {selectedStudentData?.completion?.final_score || 0}%</li>
+                <li>Time spent: {selectedStudentData?.completion?.time_spent_minutes || 0} minutes</li>
+                <li>All {selectedStudentData?.submissions?.length || 0} section submissions</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600">
+              The student will be able to start the module from scratch.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetConfirm(false)}
+              disabled={resetting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleResetProgress}
+              disabled={resetting}>
+              {resetting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Yes, Reset Progress
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
