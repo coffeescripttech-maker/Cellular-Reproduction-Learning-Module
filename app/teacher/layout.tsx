@@ -44,6 +44,7 @@ const navigationItems = [
   { icon: Target, label: 'VARK Modules', href: '/teacher/vark-modules' },
   { icon: FileText, label: 'Student Submissions', href: '/teacher/submissions' },
   { icon: Users, label: 'Students', href: '/teacher/students' },
+  { icon: GraduationCap, label: 'Teachers', href: '/teacher/teachers' },
   // { icon: FileText, label: 'Quizzes', href: '/teacher/quizzes' },
   // { icon: Activity, label: 'Activities', href: '/teacher/activities' },
   // { icon: Users, label: 'Students', href: '/teacher/students' },
