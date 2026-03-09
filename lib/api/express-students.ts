@@ -174,6 +174,27 @@ export class ExpressStudentAPI {
   }
 
   /**
+   * Get students by grade level
+   */
+  static async getStudentsByGradeLevel(gradeLevel: string) {
+    try {
+      const response = await expressClient.get(`/api/students?gradeLevel=${encodeURIComponent(gradeLevel)}`);
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return { success: true, data: response.data, total: response.total };
+    } catch (error) {
+      console.error('Error fetching students by grade level:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch students',
+      };
+    }
+  }
+
+  /**
    * Get student by ID
    */
   static async getStudentById(id: string) {

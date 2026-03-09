@@ -27,6 +27,8 @@
     "apk:release": "npm run build:capacitor && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1004.0",
+    "@aws-sdk/s3-request-presigner": "^3.1004.0",
     "@capacitor/android": "^7.4.2",
     "@capacitor/app": "^7.0.2",
     "@capacitor/camera": "^7.0.2",

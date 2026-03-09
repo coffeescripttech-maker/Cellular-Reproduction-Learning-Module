@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import { VARKModule, VARKModuleCategory } from '@/types/vark-module';
 import { Class } from '@/types/class';
+import { ExpressStudentAPI } from '@/lib/api/express-students';
 
 interface BasicInfoStepProps {
   formData: Partial<VARKModule>;
@@ -40,6 +42,39 @@ export default function BasicInfoStep({
   teacherClasses,
   availableModules = []
 }: BasicInfoStepProps) {
+  const [grade7Students, setGrade7Students] = useState<any[]>([]);
+  const [loadingGrade7Students, setLoadingGrade7Students] = useState(false);
+
+  // Fetch all students when component mounts or when target_class_id changes
+  useEffect(() => {
+    const fetchGrade7Students = async () => {
+      // Only fetch if no class is selected
+      if (!formData.target_class_id || formData.target_class_id === 'no-class') {
+        setLoadingGrade7Students(true);
+        try {
+          // Fetch all students
+          const result = await ExpressStudentAPI.getStudents();
+          if (result.success && result.data) {
+            // Filter for Grade 7 students on the frontend
+            // Note: API returns flat structure with grade_level at root level
+            const grade7Only = result.data.filter((student: any) => {
+              const gradeLevel = student.grade_level || student.gradeLevel;
+              return gradeLevel === 'Grade 7';
+            });
+            setGrade7Students(grade7Only);
+            console.log('📚 Fetched Grade 7 students:', grade7Only.length, 'out of', result.data.length, 'total students');
+          }
+        } catch (error) {
+          console.error('Error fetching Grade 7 students:', error);
+        } finally {
+          setLoadingGrade7Students(false);
+        }
+      }
+    };
+
+    fetchGrade7Students();
+  }, [formData.target_class_id]);
+
   const addLearningObjective = () => {
     const currentObjectives = formData.learning_objectives || [];
     updateFormData({
@@ -459,6 +494,100 @@ export default function BasicInfoStep({
           </Card>
 
           {/* Student Access Preview */}
+          {/* Show Grade 7 students when no class is selected */}
+          {(!formData.target_class_id || formData.target_class_id === 'no-class') && (
+            <Card className="border-0 shadow-sm bg-teal-50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-teal-600" />
+                  Student Access Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm text-teal-700">
+                    Students who will be able to access this module:
+                  </p>
+                  <div className="p-3 bg-teal-100 rounded-lg border border-teal-200">
+                    <p className="text-sm font-medium text-teal-800">
+                      📚 Default: All Grade 7 students
+                    </p>
+                    <p className="text-xs text-teal-600 mt-1">
+                      Since no specific class is selected, this module will be available to all Grade 7 students.
+                    </p>
+                  </div>
+                  
+                  {loadingGrade7Students ? (
+                    <p className="text-sm text-gray-500">Loading Grade 7 students...</p>
+                  ) : grade7Students.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-teal-800">
+                          {(() => {
+                            const accessibleStudents = grade7Students.filter(
+                              student =>
+                                !formData.target_learning_styles?.length ||
+                                formData.target_learning_styles.includes(
+                                  student.learning_style || ''
+                                )
+                            );
+                            return `${accessibleStudents.length} of ${grade7Students.length} Grade 7 students`;
+                          })()}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {formData.target_learning_styles?.length 
+                            ? formData.target_learning_styles.join(', ')
+                            : 'All styles'}
+                        </Badge>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {(() => {
+                          const accessibleStudents = grade7Students.filter(
+                            student =>
+                              !formData.target_learning_styles?.length ||
+                              formData.target_learning_styles.includes(
+                                student.learning_style || ''
+                              )
+                          );
+                          
+                          if (accessibleStudents.length === 0) {
+                            return (
+                              <p className="text-sm text-orange-600">
+                                No Grade 7 students match the selected learning styles.
+                              </p>
+                            );
+                          }
+                          
+                          return accessibleStudents.map(student => (
+                            <div
+                              key={student.id}
+                              className="flex items-center justify-between p-2 bg-white rounded border text-sm">
+                              <span className="font-medium text-gray-900">
+                                {student.full_name || student.email}
+                              </span>
+                              {student.learning_style && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs capitalize">
+                                  {student.learning_style.replace('_', ' ')}
+                                </Badge>
+                              )}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      No Grade 7 students found in the system.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Show specific class students when a class is selected */}
           {formData.target_class_id &&
             formData.target_class_id !== 'no-class' &&
             teacherClasses && (

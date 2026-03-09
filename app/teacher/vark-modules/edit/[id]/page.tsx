@@ -45,14 +45,10 @@ export default function EditVARKModulePage() {
         return;
       }
 
-      // Check if user is the creator
-      if (moduleData.created_by !== user?.id) {
-        toast.error('You do not have permission to edit this module');
-        router.push('/teacher/vark-modules');
-        return;
-      }
-
+      // Allow any teacher to edit any module (collaborative editing)
       console.log('✅ Module loaded for editing:', moduleData.title);
+      console.log('👤 Current user:', user?.id);
+      console.log('👤 Module creator:', moduleData.created_by);
       console.log('📋 Module fields check:');
       console.log('  - Title:', moduleData.title);
       console.log('  - Description:', moduleData.description?.substring(0, 100) + '...');

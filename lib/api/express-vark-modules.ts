@@ -5,7 +5,7 @@
  */
 
 import { expressClient } from './express-client';
-import { supabase } from '@/lib/supabase';
+import { uploadJSONToR2, fetchJSONFromR2 } from '../r2-storage';
 import {
   VARKModule,
   CreateVARKModuleData,
@@ -177,12 +177,12 @@ export class ExpressVARKModulesAPI {
       let createData = { ...data };
       
       if (hasLargeContent && typeof window !== 'undefined') {
-        console.log('📤 Module has content sections, will upload to Supabase storage after creation...');
+        console.log('📤 Module has large content, uploading to R2 storage first...');
         
         // Generate temporary ID for storage (browser-safe)
         const tempId = self.crypto.randomUUID();
         
-        // Upload full module JSON to Supabase Storage
+        // Upload full module JSON to R2 Storage
         const fullModuleData = {
           id: tempId,
           ...data
@@ -198,33 +198,32 @@ export class ExpressVARKModulesAPI {
           
           // Use consistent filename for easy retrieval
           const filename = `module-${tempId}.json`;
-          const filepath = `vark-modules/${filename}`;
           
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('module-content')
-            .upload(filepath, blob, {
-              contentType: 'application/json',
-              upsert: false // New file, don't overwrite
-            });
+          // Upload to R2 Storage
+          const publicUrl = await uploadJSONToR2(
+            fullModuleData,
+            filename,
+            'vark-modules'
+          );
           
-          if (uploadError) {
-            console.error('❌ Failed to upload module JSON:', uploadError);
-            throw new Error(`Storage upload failed: ${uploadError.message}`);
-          }
+          console.log('✅ Module JSON uploaded to R2:', publicUrl);
           
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('module-content')
-            .getPublicUrl(filepath);
+          // NOW strip out large content fields to avoid 413 error
+          // Only send metadata to backend
+          delete createData.content_structure;
+          delete createData.contentStructure;
+          delete createData.assessment_questions;
+          delete createData.assessmentQuestions;
+          delete createData.multimedia_content;
+          delete createData.multimediaContent;
+          delete createData.interactive_elements;
+          delete createData.interactiveElements;
           
-          console.log('✅ Module JSON uploaded to Supabase:', urlData.publicUrl);
+          // Set the json_content_url so backend knows where to fetch full content
+          createData.json_content_url = publicUrl;
+          createData.jsonContentUrl = publicUrl;
           
-          // Update the json_content_url in the create data
-          createData.json_content_url = urlData.publicUrl;
-          createData.jsonContentUrl = urlData.publicUrl;
-          
-          // Update content summary
+          // Add content summary for quick reference
           createData.content_summary = {
             sections_count: data.content_structure?.sections?.length || 0,
             assessment_count: data.assessment_questions?.length || 0,
@@ -234,11 +233,10 @@ export class ExpressVARKModulesAPI {
           };
           createData.contentSummary = createData.content_summary;
           
-          console.log('📊 Content summary created:', createData.content_summary);
+          console.log('📊 Sending lightweight metadata to backend (large content in R2)');
         } catch (uploadError) {
-          console.warn('⚠️ Failed to upload module JSON to storage:', uploadError);
-          console.log('📋 Continuing with database-only creation...');
-          // Continue with creation even if file upload fails
+          console.error('❌ Failed to upload module JSON to R2:', uploadError);
+          throw new Error(`Failed to upload module content: ${uploadError}`);
         }
       }
 
@@ -283,9 +281,9 @@ export class ExpressVARKModulesAPI {
                               updateData.content_structure.sections.length > 0;
       
       if (hasLargeContent) {
-        console.log('📤 Module has content sections, uploading to Supabase storage...');
+        console.log('📤 Module has large content, uploading to R2 storage first...');
         
-        // Upload full module JSON to Supabase Storage
+        // Upload full module JSON to R2 Storage
         const fullModuleData = {
           id,
           ...updateData
@@ -301,47 +299,45 @@ export class ExpressVARKModulesAPI {
           
           // Use consistent filename for easy retrieval
           const filename = `module-${id}.json`;
-          const filepath = `vark-modules/${filename}`;
           
-          // Upload to Supabase Storage (upsert to allow updates)
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('module-content')
-            .upload(filepath, blob, {
-              contentType: 'application/json',
-              upsert: true // Allow overwriting on updates
-            });
+          // Upload to R2 Storage (upsert to allow updates)
+          const publicUrl = await uploadJSONToR2(
+            fullModuleData,
+            filename,
+            'vark-modules'
+          );
           
-          if (uploadError) {
-            console.error('❌ Failed to upload module JSON:', uploadError);
-            throw new Error(`Storage upload failed: ${uploadError.message}`);
-          }
+          console.log('✅ Module JSON uploaded to R2:', publicUrl);
           
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('module-content')
-            .getPublicUrl(filepath);
+          // NOW strip out large content fields to avoid 413 error
+          // Only send metadata to backend
+          delete updateData.content_structure;
+          delete updateData.contentStructure;
+          delete updateData.assessment_questions;
+          delete updateData.assessmentQuestions;
+          delete updateData.multimedia_content;
+          delete updateData.multimediaContent;
+          delete updateData.interactive_elements;
+          delete updateData.interactiveElements;
           
-          console.log('✅ Module JSON uploaded to Supabase:', urlData.publicUrl);
-          
-          // Update the json_content_url in the update data
-          updateData.json_content_url = urlData.publicUrl;
-          updateData.jsonContentUrl = urlData.publicUrl;
+          // Set the json_content_url so backend knows where to fetch full content
+          updateData.json_content_url = publicUrl;
+          updateData.jsonContentUrl = publicUrl;
           
           // Update content summary
           updateData.content_summary = {
-            sections_count: updateData.content_structure?.sections?.length || 0,
-            assessment_count: updateData.assessment_questions?.length || 0,
-            has_multimedia: Object.values(updateData.multimedia_content || {}).some(
+            sections_count: data.content_structure?.sections?.length || 0,
+            assessment_count: data.assessment_questions?.length || 0,
+            has_multimedia: Object.values(data.multimedia_content || {}).some(
               v => v && (Array.isArray(v) ? v.length > 0 : true)
             )
           };
           updateData.contentSummary = updateData.content_summary;
           
-          console.log('📊 Content summary updated:', updateData.content_summary);
+          console.log('📊 Sending lightweight metadata to backend (large content in R2)');
         } catch (uploadError) {
-          console.warn('⚠️ Failed to upload module JSON to storage:', uploadError);
-          console.log('📋 Continuing with database-only update...');
-          // Continue with update even if file upload fails
+          console.error('❌ Failed to upload module JSON to R2:', uploadError);
+          throw new Error(`Failed to upload module content: ${uploadError}`);
         }
       }
 
