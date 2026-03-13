@@ -7,7 +7,7 @@ export function Footer() {
   
   const developers = [
     'Georgia Jane Tudio',
-    'Gwen Yanson',
+    'Pearl Gwayne Yanson ',
     'Micaella Marie Solano',
     'Rhomela Jane Velasco'
   ];

@@ -80,29 +80,38 @@ export class ExpressVARKModulesAPI {
   }
 
   /**
-   * Fetch module content from external URL
+   * Fetch module content via backend proxy (avoids DNS issues with R2)
    */
-  private async fetchModuleContent(url: string): Promise<any> {
+  private async fetchModuleContent(moduleId: string, url: string): Promise<any> {
     try {
-      console.log('📥 Fetching module content from:', url);
+      console.log('📥 Fetching module content via backend proxy for module:', moduleId);
       
-      // Fetch with CORS mode
-      const response = await fetch(url, {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-          'Accept': 'application/json',
-        },
-        cache: 'no-cache'
-      });
+      // Use backend proxy instead of direct R2 access
+      const response = await expressClient.get(`/api/modules/${moduleId}/content`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch content: ${response.status} ${response.statusText}`);
+      if (response.error) {
+        console.warn('⚠️ Backend proxy failed, trying direct R2 access as fallback');
+        // Fallback to direct R2 access if proxy fails
+        const directResponse = await fetch(url, {
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json',
+          },
+          cache: 'no-cache'
+        });
+        
+        if (!directResponse.ok) {
+          throw new Error(`Failed to fetch content: ${directResponse.status} ${directResponse.statusText}`);
+        }
+        
+        const content = await directResponse.json();
+        console.log('✅ Module content fetched via direct R2 access (fallback)');
+        return content;
       }
       
-      const content = await response.json();
-      console.log('✅ Module content fetched successfully');
-      return content;
+      console.log('✅ Module content fetched successfully via backend proxy');
+      return response.data || response;
     } catch (error) {
       console.error('❌ Error fetching module content:', error);
       // Return null instead of throwing to allow fallback to database content
@@ -128,7 +137,7 @@ export class ExpressVARKModulesAPI {
       // If module has json_content_url, fetch and merge the full content
       if (module.json_content_url) {
         console.log('📥 Module has json_content_url, fetching full content...');
-        const fullContent = await this.fetchModuleContent(module.json_content_url);
+        const fullContent = await this.fetchModuleContent(id, module.json_content_url);
         
         // Only merge if fetch was successful
         if (fullContent) {

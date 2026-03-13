@@ -144,7 +144,6 @@ export default function TeacherVARKModulesPage() {
       if (user?.id) {
         const classesData = await ClassesAPI.getTeacherClasses(user.id);
         setTeacherClasses(classesData);
-        setLoading(false);
       }
 
       // Load all modules (teachers can see all)
@@ -153,7 +152,6 @@ export default function TeacherVARKModulesPage() {
 
       // Set empty categories array since we're not using category foreign keys anymore
       setCategories([]);
-      setLoading(false);
     } catch (error) {
       console.error('Error loading VARK modules data:', error);
       toast.error('Failed to load VARK modules data');

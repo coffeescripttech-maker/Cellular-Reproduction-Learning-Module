@@ -24,21 +24,27 @@ export class ExpressStatsAPI {
     try {
       console.log('📊 Fetching homepage statistics from Express API...');
 
-      const response = await expressClient.get('/stats/homepage');
+      const response = await expressClient.get('/api/stats/homepage');
+      
+      console.log('📊 Raw response from Express API:', response);
 
-      if (response.data.success) {
-        console.log('✅ Homepage stats fetched successfully:', response.data.data);
+      // Check if response has error
+      if (response && response.error) {
+        console.error('❌ Stats API error:', response.error);
+        throw new Error(response.error.message || 'Failed to fetch statistics');
+      }
+
+      // Backend returns: { success: true, data: {...} }
+      // Express client returns this directly (not wrapped)
+      if (response && (response as any).success && (response as any).data) {
+        console.log('✅ Homepage stats fetched successfully:', (response as any).data);
         return {
           success: true,
-          data: response.data.data
-        };
-      } else {
-        console.error('❌ Stats API error:', response.data.error);
-        return {
-          success: false,
-          error: response.data.error || 'Failed to fetch statistics'
+          data: (response as any).data as HomepageStats
         };
       }
+      
+      throw new Error('Invalid response from stats API');
     } catch (error: any) {
       console.error('❌ Error in getHomepageStats:', error);
       
@@ -75,19 +81,28 @@ export class ExpressStatsAPI {
     error?: string;
   }> {
     try {
-      const response = await expressClient.get('/stats/health');
+      const response = await expressClient.get('/api/stats/health');
 
-      if (response.data.success) {
-        return {
-          success: true,
-          data: response.data.data
-        };
-      } else {
+      // Check if response has error
+      if (response && response.error) {
         return {
           success: false,
-          error: response.data.error || 'Health check failed'
+          error: response.error.message || 'Health check failed'
         };
       }
+
+      // Backend returns: { success: true, data: {...} }
+      if (response && (response as any).success && (response as any).data) {
+        return {
+          success: true,
+          data: (response as any).data
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Invalid health check response'
+      };
     } catch (error: any) {
       return {
         success: false,
