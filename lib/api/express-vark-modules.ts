@@ -80,40 +80,49 @@ export class ExpressVARKModulesAPI {
   }
 
   /**
-   * Fetch module content via backend proxy (avoids DNS issues with R2)
+   * Fetch module content with hybrid approach:
+   * 1. Try backend redirect to R2 (fast, no memory)
+   * 2. If DNS fails, use backend proxy (slower but works everywhere)
    */
   private async fetchModuleContent(moduleId: string, url: string): Promise<any> {
     try {
-      console.log('📥 Fetching module content via backend proxy for module:', moduleId);
+      console.log('📥 [HYBRID] Fetching module content for module:', moduleId);
       
-      // Use backend proxy instead of direct R2 access
-      const response = await expressClient.get(`/api/modules/${moduleId}/content`);
-      
-      if (response.error) {
-        console.warn('⚠️ Backend proxy failed, trying direct R2 access as fallback');
-        // Fallback to direct R2 access if proxy fails
-        const directResponse = await fetch(url, {
-          method: 'GET',
-          mode: 'cors',
-          headers: {
-            'Accept': 'application/json',
-          },
-          cache: 'no-cache'
-        });
+      // Step 1: Try backend redirect to R2 (follows redirect automatically)
+      console.log('🔀 [HYBRID] Attempting redirect method (primary)...');
+      try {
+        const redirectResponse = await expressClient.get(`/api/modules/${moduleId}/content`);
         
-        if (!directResponse.ok) {
-          throw new Error(`Failed to fetch content: ${directResponse.status} ${directResponse.statusText}`);
+        if (!redirectResponse.error) {
+          console.log('✅ [HYBRID] Content fetched via redirect (fast path)');
+          return redirectResponse.data || redirectResponse;
         }
+      } catch (redirectError: any) {
+        // Check if it's a DNS error
+        const isDNSError = redirectError.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+                          redirectError.message?.includes('ENOTFOUND') ||
+                          redirectError.message?.includes('DNS');
         
-        const content = await directResponse.json();
-        console.log('✅ Module content fetched via direct R2 access (fallback)');
-        return content;
+        if (isDNSError) {
+          console.warn('⚠️ [HYBRID] DNS error detected, switching to proxy fallback');
+        } else {
+          console.warn('⚠️ [HYBRID] Redirect failed:', redirectError.message);
+        }
       }
       
-      console.log('✅ Module content fetched successfully via backend proxy');
-      return response.data || response;
+      // Step 2: Fallback to backend proxy (works when DNS fails)
+      console.log('🔄 [HYBRID] Using proxy fallback method...');
+      const proxyResponse = await expressClient.get(`/api/modules/${moduleId}/content-proxy`);
+      
+      if (proxyResponse.error) {
+        throw new Error(`Proxy fallback failed: ${proxyResponse.error.message}`);
+      }
+      
+      console.log('✅ [HYBRID] Content fetched via proxy fallback (slower but reliable)');
+      return proxyResponse.data || proxyResponse;
+      
     } catch (error) {
-      console.error('❌ Error fetching module content:', error);
+      console.error('❌ [HYBRID] All fetch methods failed:', error);
       // Return null instead of throwing to allow fallback to database content
       return null;
     }
