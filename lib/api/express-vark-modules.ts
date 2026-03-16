@@ -241,10 +241,11 @@ export class ExpressVARKModulesAPI {
    * Get module by ID (optimized for editing - skips R2 content fetch)
    * @param id Module ID
    * @param skipContent Whether to skip fetching full content from R2 (default: false)
+   * @param useProgressive Whether to use progressive loading for large modules (default: false)
    */
-  async getModuleById(id: string, skipContent: boolean = false) {
+  async getModuleById(id: string, skipContent: boolean = false, useProgressive: boolean = false) {
     try {
-      console.log(`📥 [GET MODULE] Fetching module ${id}, skipContent: ${skipContent}`);
+      console.log(`📥 [GET MODULE] Fetching module ${id}, skipContent: ${skipContent}, useProgressive: ${useProgressive}`);
       const startTime = Date.now();
       
       const response = await expressClient.get(`/api/modules/${id}`);
@@ -267,13 +268,21 @@ export class ExpressVARKModulesAPI {
 
       // If module has json_content_url, fetch and merge the full content
       if (module.json_content_url) {
-        console.log('📥 [GET MODULE] Module has json_content_url, fetching optimized content...');
+        console.log('📥 [GET MODULE] Module has json_content_url, fetching content...');
         const contentStartTime = Date.now();
         
-        const fullContent = await this.fetchModuleContentOptimized(id, module.json_content_url);
+        let fullContent;
+        
+        if (useProgressive) {
+          console.log('� [GET MODULE] Using progressive loading...');
+          fullContent = await this.fetchModuleContentProgressive(id);
+        } else {
+          console.log('📥 [GET MODULE] Using optimized content fetch...');
+          fullContent = await this.fetchModuleContentOptimized(id, module.json_content_url);
+        }
         
         const contentFetchTime = Date.now() - contentStartTime;
-        console.log(`📊 [GET MODULE] Optimized content fetch took ${contentFetchTime}ms`);
+        console.log(`📊 [GET MODULE] Content fetch took ${contentFetchTime}ms`);
         
         // Only merge if fetch was successful
         if (fullContent) {
@@ -818,6 +827,178 @@ export class ExpressVARKModulesAPI {
     } catch (error) {
       console.error('Error fetching module completions:', error);
       return [];
+    }
+  }
+
+  /**
+   * Progressive content loading - Load metadata first, then sections on demand
+   */
+  async fetchModuleContentProgressive(moduleId: string): Promise<any> {
+    try {
+      console.log('🔄 [PROGRESSIVE] Starting progressive content loading for module:', moduleId);
+      const startTime = Date.now();
+      
+      // Step 1: Load metadata first (instant)
+      console.log('📋 [PROGRESSIVE] Loading metadata...');
+      const metadataResponse = await expressClient.get(`/api/modules/${moduleId}/content-progressive?part=metadata`);
+      
+      if (metadataResponse.error) {
+        console.warn('⚠️ [PROGRESSIVE] Metadata fetch failed, falling back to optimized loading:', metadataResponse.error.message);
+        // Fallback to optimized loading if progressive endpoints don't exist
+        return await this.fetchModuleContentOptimized(moduleId, '');
+      }
+      
+      console.log('🔍 [PROGRESSIVE] Raw metadata response:', metadataResponse);
+      
+      const metadata = metadataResponse.data;
+      if (!metadata) {
+        console.warn('⚠️ [PROGRESSIVE] No metadata received, falling back to optimized loading');
+        return await this.fetchModuleContentOptimized(moduleId, '');
+      }
+      
+      console.log('🔍 [PROGRESSIVE] Metadata received:', {
+        has_progressive_content: metadata.has_progressive_content,
+        total_sections: metadata.content_structure?.total_sections,
+        title: metadata.title
+      });
+      
+      const metadataTime = Date.now() - startTime;
+      console.log(`✅ [PROGRESSIVE] Metadata loaded in ${metadataTime}ms`);
+      
+      // If no progressive content available, return metadata as-is
+      if (!metadata.has_progressive_content) {
+        console.log('📝 [PROGRESSIVE] No progressive content available, falling back to optimized loading');
+        // For large modules, we still need to load the full content, just not progressively
+        return await this.fetchModuleContentOptimized(moduleId, '');
+      }
+      
+      // Step 2: Load sections progressively
+      const totalSections = metadata.content_structure?.total_sections || 0;
+      console.log(`📊 [PROGRESSIVE] Module has ${totalSections} sections to load`);
+      
+      // For very large modules (>100 sections), fall back to optimized loading
+      if (totalSections > 100) {
+        console.log('⚠️ [PROGRESSIVE] Module too large for progressive loading, using optimized loading');
+        return await this.fetchModuleContentOptimized(moduleId, '');
+      }
+      
+      if (totalSections === 0) {
+        // No sections to load, just get assessments
+        console.log('📝 [PROGRESSIVE] Loading assessments only...');
+        const assessmentsResponse = await expressClient.get(`/api/modules/${moduleId}/content-progressive?part=assessments`);
+        
+        if (!assessmentsResponse.error) {
+          metadata.assessment_questions = assessmentsResponse.data.assessment_questions || [];
+        }
+        
+        return metadata;
+      }
+      
+      // Step 3: Load sections in batches for better performance
+      const batchSize = 3; // Load 3 sections at a time
+      const sections = [];
+      let multimediaContent = {};
+      let interactiveElements = {};
+      
+      console.log(`🔄 [PROGRESSIVE] Loading ${totalSections} sections in batches of ${batchSize}...`);
+      
+      for (let i = 0; i < totalSections; i += batchSize) {
+        const batchPromises = [];
+        const batchEnd = Math.min(i + batchSize, totalSections);
+        
+        console.log(`📦 [PROGRESSIVE] Loading sections ${i} to ${batchEnd - 1}...`);
+        
+        for (let j = i; j < batchEnd; j++) {
+          batchPromises.push(
+            Promise.race([
+              expressClient.get(`/api/modules/${moduleId}/content-progressive?part=section-${j}`),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Section request timeout')), 30000)
+              )
+            ])
+          );
+        }
+        
+        const batchResults = await Promise.all(batchPromises);
+        
+        let failedCount = 0;
+        batchResults.forEach((result, index) => {
+          if (!result.error && result.data) {
+            const sectionData = result.data;
+            sections[i + index] = sectionData.section;
+            
+            // Merge multimedia and interactive content
+            if (sectionData.multimedia_content) {
+              multimediaContent = { ...multimediaContent, ...sectionData.multimedia_content };
+            }
+            if (sectionData.interactive_elements) {
+              interactiveElements = { ...interactiveElements, ...sectionData.interactive_elements };
+            }
+          } else {
+            failedCount++;
+            console.warn(`⚠️ [PROGRESSIVE] Failed to load section ${i + index}:`, result.error?.message);
+            sections[i + index] = null; // Placeholder for failed section
+          }
+        });
+        
+        // If too many sections fail, fall back to optimized loading
+        if (failedCount >= batchSize && i === 0) {
+          console.warn('⚠️ [PROGRESSIVE] Too many section failures, falling back to optimized loading');
+          return await this.fetchModuleContentOptimized(moduleId, '');
+        }
+        
+        const batchTime = Date.now() - startTime;
+        console.log(`✅ [PROGRESSIVE] Batch ${Math.floor(i / batchSize) + 1} loaded in ${batchTime}ms`);
+      }
+      
+      // Step 4: Load assessments
+      console.log('📝 [PROGRESSIVE] Loading assessments...');
+      const assessmentsResponse = await expressClient.get(`/api/modules/${moduleId}/content-progressive?part=assessments`);
+      
+      let assessmentQuestions = [];
+      if (!assessmentsResponse.error) {
+        assessmentQuestions = assessmentsResponse.data.assessment_questions || [];
+      }
+      
+      // Step 5: Combine everything
+      const completeModule = {
+        ...metadata,
+        content_structure: {
+          ...metadata.content_structure,
+          sections: sections.filter(section => section !== null) // Remove failed sections
+        },
+        assessment_questions: assessmentQuestions,
+        multimedia_content: multimediaContent,
+        interactive_elements: interactiveElements
+      };
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`🎉 [PROGRESSIVE] Complete module loaded in ${totalTime}ms`);
+      console.log(`📊 [PROGRESSIVE] Loaded ${sections.length} sections, ${assessmentQuestions.length} assessments`);
+      
+      // Cache the complete module
+      const cacheKey = `module_content_${moduleId}`;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(completeModule));
+        localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+        console.log('💾 [PROGRESSIVE] Complete module cached');
+      } catch (cacheError) {
+        console.warn('⚠️ [PROGRESSIVE] Failed to cache complete module:', cacheError.message);
+      }
+      
+      return completeModule;
+      
+    } catch (error) {
+      console.error('❌ [PROGRESSIVE] Progressive loading failed:', error);
+      console.log('🔄 [PROGRESSIVE] Falling back to optimized loading...');
+      
+      // Fallback to optimized loading if progressive loading fails completely
+      try {
+        return await this.fetchModuleContentOptimized(moduleId, '');
+      } catch (fallbackError) {
+        console.error('❌ [PROGRESSIVE] Fallback also failed:', fallbackError);
+        throw error; // Throw original error
+      }
     }
   }
 }

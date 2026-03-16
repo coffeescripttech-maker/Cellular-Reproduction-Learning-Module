@@ -101,7 +101,9 @@ export default function EditVARKModulePage() {
         }
       }, 200);
       
-      const moduleData = await expressVARKModulesAPI.getModuleById(moduleId, false); // skipContent = false
+      // Use progressive loading for better performance on large modules
+      console.log('🔄 Attempting progressive loading for better performance...');
+      const moduleData = await expressVARKModulesAPI.getModuleById(moduleId, false, true); // skipContent = false, useProgressive = true
       clearInterval(progressInterval);
       
       const contentTime = Date.now() - contentStartTime;
@@ -192,9 +194,9 @@ export default function EditVARKModulePage() {
       setSaveProgress(90);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Reload the module to get fresh data
+      // Update the module state with the saved data instead of reloading
       setSaveProgress(100);
-      await loadModule();
+      setModule(updatedModule);
     } catch (error) {
       console.error('❌ Error saving module:', error);
       toast.error('Failed to save module');
