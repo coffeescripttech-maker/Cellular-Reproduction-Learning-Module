@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Connection Test</title>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <button onclick="testConnection()">Test Backend Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing connection...';
+            
+            try {
+                console.log('Testing connection to http://localhost:3001');
+                
+                // Test basic connection
+                const response = await fetch('http://localhost:3001', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                resultDiv.innerHTML = `
+                    <h3>✅ Connection Successful</h3>
+                    <p>Status: ${response.status}</p>
+                    <p>Message: ${data.message}</p>
+                    <p>Version: ${data.version}</p>
+                `;
+                
+                // Test modules endpoint (should fail with 401)
+                try {
+                    const modulesResponse = await fetch('http://localhost:3001/api/modules', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const modulesData = await modulesResponse.json();
+                    console.log('Modules response:', modulesResponse.status, modulesData);
+                    
+                    resultDiv.innerHTML += `
+                        <h3>📋 Modules Endpoint Test</h3>
+                        <p>Status: ${modulesResponse.status} (Expected: 401)</p>
+                        <p>Error: ${modulesData.error?.message || 'No error'}</p>
+                    `;
+                } catch (modulesError) {
+                    console.error('Modules endpoint error:', modulesError);
+                    resultDiv.innerHTML += `
+                        <h3>❌ Modules Endpoint Error</h3>
+                        <p>Error: ${modulesError.message}</p>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                resultDiv.innerHTML = `
+                    <h3>❌ Connection Failed</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>This might be a CORS issue or the backend is not running.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

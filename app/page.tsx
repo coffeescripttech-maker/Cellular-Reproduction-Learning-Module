@@ -160,7 +160,8 @@ export default function HomePage() {
               info below.
             </p>
           </div>
-          <DebugSessionInfo />
+          {/* Debug component temporarily disabled to prevent Supabase calls */}
+          {/* <DebugSessionInfo /> */}
         </div>
       </div>
     );

@@ -58,6 +58,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
     getInitialSession();
 
+    // Only set up auth state listener if supabase client exists
+    if (!supabase) {
+      console.warn('⚠️ Supabase client not available');
+      return;
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const { user } = await AuthAPI.getCurrentUser();
@@ -78,7 +84,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [USE_NEW_API]);
 
@@ -159,18 +167,18 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     setAuthState((prev) => ({ ...prev, error: null }));
   };
 
+  const contextValue = {
+    authState,
+    login,
+    register,
+    forgotPassword,
+    logout,
+    clearError,
+  };
+
   return React.createElement(
     SupabaseAuthContext.Provider,
-    {
-      value: {
-        authState,
-        login,
-        register,
-        forgotPassword,
-        logout,
-        clearError,
-      }
-    },
+    { value: contextValue },
     children
   );
 }

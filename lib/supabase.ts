@@ -19,9 +19,16 @@ let _supabaseAdminClient: SupabaseClient<Database> | null = null;
 
 /**
  * Get or create the main Supabase client instance (singleton)
- * Returns null if credentials are not available
+ * Returns null if credentials are not available or if using Express API
  */
 function getSupabaseClient(): SupabaseClient<Database> | null {
+  // Check if we should use Express API instead
+  const USE_NEW_API = process.env.NEXT_PUBLIC_USE_NEW_API === 'true';
+  if (USE_NEW_API) {
+    console.log('🚫 Supabase client disabled - using Express API');
+    return null;
+  }
+
   // Return null if credentials are missing
   if (!supabaseUrl || !supabaseAnonKey) {
     return null;
@@ -42,9 +49,16 @@ function getSupabaseClient(): SupabaseClient<Database> | null {
 
 /**
  * Get or create the admin Supabase client instance (singleton)
- * Returns null if credentials are not available
+ * Returns null if credentials are not available or if using Express API
  */
 function getSupabaseAdminClient(): SupabaseClient<Database> | null {
+  // Check if we should use Express API instead
+  const USE_NEW_API = process.env.NEXT_PUBLIC_USE_NEW_API === 'true';
+  if (USE_NEW_API) {
+    console.log('🚫 Supabase admin client disabled - using Express API');
+    return null;
+  }
+
   // Return null if credentials are missing
   if (!supabaseUrl || !serviceRoleKey) {
     return null;
@@ -75,6 +89,13 @@ export const supabaseAdmin = getSupabaseAdminClient();
 
 // Server-side client for API routes (creates new instance each time)
 export const createServerSupabaseClient = (): SupabaseClient<Database> | null => {
+  // Check if we should use Express API instead
+  const USE_NEW_API = process.env.NEXT_PUBLIC_USE_NEW_API === 'true';
+  if (USE_NEW_API) {
+    console.log('🚫 Server Supabase client disabled - using Express API');
+    return null;
+  }
+
   if (!supabaseUrl || !serviceRoleKey) {
     return null;
   }

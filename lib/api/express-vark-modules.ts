@@ -129,11 +129,15 @@ export class ExpressVARKModulesAPI {
   }
 
   /**
-   * Get module by ID
-   * If module has json_content_url, fetches and merges full content from storage
+   * Get module by ID (optimized for editing - skips R2 content fetch)
+   * @param id Module ID
+   * @param skipContent Whether to skip fetching full content from R2 (default: false)
    */
-  async getModuleById(id: string) {
+  async getModuleById(id: string, skipContent: boolean = false) {
     try {
+      console.log(`📥 [GET MODULE] Fetching module ${id}, skipContent: ${skipContent}`);
+      const startTime = Date.now();
+      
       const response = await expressClient.get(`/api/modules/${id}`);
 
       if (response.error) {
@@ -143,10 +147,24 @@ export class ExpressVARKModulesAPI {
       // Convert camelCase to snake_case for frontend compatibility
       let module = convertModuleToSnakeCase(response.data);
 
+      const dbFetchTime = Date.now() - startTime;
+      console.log(`✅ [GET MODULE] Database fetch completed in ${dbFetchTime}ms`);
+
+      // If skipContent is true, return module without R2 content fetch
+      if (skipContent) {
+        console.log('⚡ [GET MODULE] Skipping R2 content fetch for faster loading');
+        return module;
+      }
+
       // If module has json_content_url, fetch and merge the full content
       if (module.json_content_url) {
-        console.log('📥 Module has json_content_url, fetching full content...');
+        console.log('📥 [GET MODULE] Module has json_content_url, fetching full content...');
+        const contentStartTime = Date.now();
+        
         const fullContent = await this.fetchModuleContent(id, module.json_content_url);
+        
+        const contentFetchTime = Date.now() - contentStartTime;
+        console.log(`📊 [GET MODULE] R2 content fetch took ${contentFetchTime}ms`);
         
         // Only merge if fetch was successful
         if (fullContent) {
@@ -167,16 +185,19 @@ export class ExpressVARKModulesAPI {
             category_name: module.category_name
           };
           
-          console.log('✅ Full module content merged from storage');
+          const totalTime = Date.now() - startTime;
+          console.log(`✅ [GET MODULE] Full module content merged in ${totalTime}ms total`);
           console.log('📊 Content structure sections:', module.content_structure?.sections?.length || 0);
         } else {
-          console.warn('⚠️ Failed to fetch module content from storage, using database content');
+          console.warn('⚠️ [GET MODULE] Failed to fetch module content from storage, using database content');
         }
       }
 
+      const totalTime = Date.now() - startTime;
+      console.log(`🎯 [GET MODULE] Module fetch completed in ${totalTime}ms`);
       return module;
     } catch (error) {
-      console.error('Error fetching module:', error);
+      console.error('❌ [GET MODULE] Error fetching module:', error);
       throw error;
     }
   }

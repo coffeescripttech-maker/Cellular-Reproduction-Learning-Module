@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { VARKModulesAPI } from '@/lib/api/unified-api';
+import { expressVARKModulesAPI } from '@/lib/api/express-vark-modules';
 import VARKModuleBuilder from '@/components/vark-modules/vark-module-builder';
 import { type VARKModule } from '@/types/vark-module';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,12 +33,14 @@ export default function EditVARKModulePage() {
       setLoading(true);
       console.log('📥 Fetching module for editing:', moduleId);
       
-      // Fetch all modules for prerequisite dropdown
+      // Fetch all modules for prerequisite dropdown (fast query)
       const allModules = await VARKModulesAPI.getModules();
       setAvailableModules(allModules);
       console.log('📚 Loaded', allModules.length, 'modules for prerequisite selection');
       
-      const moduleData = await VARKModulesAPI.getModuleById(moduleId);
+      // Use fast loading for edit page - skip R2 content fetch initially
+      // We'll load the full content when the user actually starts editing
+      const moduleData = await expressVARKModulesAPI.getModuleById(moduleId, true); // skipContent = true
       
       if (!moduleData) {
         toast.error('Module not found');
@@ -46,7 +49,7 @@ export default function EditVARKModulePage() {
       }
 
       // Allow any teacher to edit any module (collaborative editing)
-      console.log('✅ Module loaded for editing:', moduleData.title);
+      console.log('✅ Module loaded for editing (fast mode):', moduleData.title);
       console.log('👤 Current user:', user?.id);
       console.log('👤 Module creator:', moduleData.created_by);
       console.log('📋 Module fields check:');
@@ -57,6 +60,7 @@ export default function EditVARKModulePage() {
       console.log('  - Assessment Questions:', moduleData.assessment_questions?.length || 0);
       console.log('  - Difficulty Level:', moduleData.difficulty_level);
       console.log('  - Duration:', moduleData.estimated_duration_minutes, 'minutes');
+      console.log('  - Has JSON Content URL:', !!moduleData.json_content_url);
       
       setModule(moduleData);
     } catch (error) {

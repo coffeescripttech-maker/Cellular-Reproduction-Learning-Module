@@ -1261,6 +1261,9 @@ export default function TeacherVARKModulesPage() {
                         Target Learning Styles
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Prerequisite
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1374,6 +1377,28 @@ export default function TeacherVARKModulesPage() {
                                 );
                               }
                             })()}
+                          </td>
+
+                          {/* Status Column */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <Badge
+                                variant={module.is_published ? "default" : "secondary"}
+                                className={
+                                  module.is_published
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }>
+                                {module.is_published ? "Published" : "Draft"}
+                              </Badge>
+                              {module.difficulty_level && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${difficultyColors[module.difficulty_level as keyof typeof difficultyColors] || 'bg-gray-100 text-gray-800'}`}>
+                                  {module.difficulty_level.charAt(0).toUpperCase() + module.difficulty_level.slice(1)}
+                                </Badge>
+                              )}
+                            </div>
                           </td>
 
                           {/* Prerequisite Column */}

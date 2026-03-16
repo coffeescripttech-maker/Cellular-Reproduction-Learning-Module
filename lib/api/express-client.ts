@@ -168,6 +168,7 @@ class ExpressApiClient {
 
     // Build full URL
     const url = `${this.baseUrl}${endpoint}`;
+    console.log('🌐 Making request to:', url);
 
     // Build headers
     const headers: Record<string, string> = {
@@ -178,14 +179,22 @@ class ExpressApiClient {
     // Add authorization header if not skipped and token exists
     if (!skipAuth && this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
+      console.log('🔑 Adding auth token to request');
+    } else {
+      console.log('⚠️ No auth token available or auth skipped');
     }
 
     try {
-      // Make the request
+      console.log('📤 Sending request...');
+      // Make the request without timeout to prevent abort errors
       const response = await fetch(url, {
         ...fetchConfig,
         headers,
+        // Remove any timeout/signal that might cause abort errors
+        signal: undefined
       });
+      
+      console.log('📥 Response received:', response.status, response.statusText);
 
       // Handle 401 Unauthorized - token expired
       if (response.status === 401 && !skipRefresh && this.refreshToken) {
@@ -217,7 +226,13 @@ class ExpressApiClient {
 
       return this.handleResponse<T>(response);
     } catch (error) {
-      console.error('Request error:', error);
+      console.error('❌ Request error:', error);
+      console.error('🔍 Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        url,
+        endpoint,
+        baseUrl: this.baseUrl
+      });
       return {
         error: {
           code: 'NETWORK_ERROR',
