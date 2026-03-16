@@ -7,7 +7,8 @@
 
 'use client';
 
-import { useAuth as useSupabaseAuth, AuthProvider as SupabaseAuthProvider } from './useAuth';
+import React from 'react';
+import { useSupabaseAuth, SupabaseAuthProvider } from './useSupabaseAuth';
 import { useExpressAuth, ExpressAuthProvider } from './useExpressAuth';
 
 // Check feature flag

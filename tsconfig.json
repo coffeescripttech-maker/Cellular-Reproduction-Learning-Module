@@ -35,7 +35,7 @@
     "next-env.d.ts",
     "out/types/**/*.ts",
     ".next/dev/types/**/*.ts"
-  ],
+, "hooks/fic"  ],
   "exclude": [
     "node_modules"
   ]

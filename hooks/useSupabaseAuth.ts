@@ -1,85 +1,95 @@
-"use client"
+'use client';
 
-import type React from "react"
-
-import { useState, useEffect, createContext, useContext } from "react"
-import { supabase } from "@/lib/supabase"
-import { AuthAPI } from "@/lib/api/auth"
-import type { AuthState, LoginCredentials, RegisterData, ForgotPasswordData } from "@/types/auth"
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { supabase } from '@/lib/supabase';
+import { AuthAPI } from '@/lib/api/auth';
+import type { AuthState, LoginCredentials, RegisterData, ForgotPasswordData } from '@/types/auth';
 
 interface SupabaseAuthContextType {
-  authState: AuthState
-  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message: string }>
-  register: (data: RegisterData) => Promise<{ success: boolean; message: string }>
-  forgotPassword: (data: ForgotPasswordData) => Promise<{ success: boolean; message: string }>
-  logout: () => Promise<void>
-  clearError: () => void
+  authState: AuthState;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; message: string }>;
+  forgotPassword: (data: ForgotPasswordData) => Promise<{ success: boolean; message: string }>;
+  logout: () => Promise<void>;
+  clearError: () => void;
 }
 
-const SupabaseAuthContext = createContext<SupabaseAuthContextType | null>(null)
+const SupabaseAuthContext = createContext<SupabaseAuthContextType | null>(null);
 
 export function useSupabaseAuth() {
-  const context = useContext(SupabaseAuthContext)
+  const context = useContext(SupabaseAuthContext);
   if (!context) {
-    throw new Error("useSupabaseAuth must be used within SupabaseAuthProvider")
+    throw new Error('useSupabaseAuth must be used within SupabaseAuthProvider');
   }
-  return context
+  return context;
 }
 
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
+  const USE_NEW_API = process.env.NEXT_PUBLIC_USE_NEW_API === 'true';
+  
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
     isLoading: true,
     error: null,
-  })
+  });
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { user, session } = await AuthAPI.getCurrentUser()
+    if (USE_NEW_API) {
+      console.log('🚫 Supabase auth disabled - using Express API');
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
 
+    const getInitialSession = async () => {
+      const { user } = await AuthAPI.getCurrentUser();
       setAuthState({
         user,
         isAuthenticated: !!user,
         isLoading: false,
         error: null,
-      })
-    }
+      });
+    };
 
-    getInitialSession()
+    getInitialSession();
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        const { user } = await AuthAPI.getCurrentUser()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { user } = await AuthAPI.getCurrentUser();
         setAuthState({
           user,
           isAuthenticated: !!user,
           isLoading: false,
           error: null,
-        })
-      } else if (event === "SIGNED_OUT") {
+        });
+      } else if (event === 'SIGNED_OUT') {
         setAuthState({
           user: null,
           isAuthenticated: false,
           isLoading: false,
           error: null,
-        })
+        });
       }
-    })
+    });
 
     return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+      subscription.unsubscribe();
+    };
+  }, [USE_NEW_API]);
 
   const login = async (credentials: LoginCredentials) => {
-    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }))
+    if (USE_NEW_API) {
+      console.warn('🚫 Supabase login called but Express API is enabled');
+      return { success: false, message: 'Use Express API for authentication' };
+    }
 
-    const result = await AuthAPI.login(credentials)
+    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+    const result = await AuthAPI.login(credentials);
 
     if (result.success && result.user) {
       setAuthState({
@@ -87,74 +97,80 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         isAuthenticated: true,
         isLoading: false,
         error: null,
-      })
+      });
     } else {
       setAuthState((prev) => ({
         ...prev,
         isLoading: false,
         error: result.message,
-      }))
+      }));
     }
 
-    return { success: result.success, message: result.message }
-  }
+    return { success: result.success, message: result.message };
+  };
 
   const register = async (data: RegisterData) => {
-    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }))
+    if (USE_NEW_API) {
+      console.warn('🚫 Supabase register called but Express API is enabled');
+      return { success: false, message: 'Use Express API for authentication' };
+    }
 
-    const result = await AuthAPI.register(data)
-
+    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+    const result = await AuthAPI.register(data);
     setAuthState((prev) => ({
       ...prev,
       isLoading: false,
       error: result.success ? null : result.message,
-    }))
+    }));
 
-    return { success: result.success, message: result.message }
-  }
+    return { success: result.success, message: result.message };
+  };
 
   const forgotPassword = async (data: ForgotPasswordData) => {
-    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }))
+    if (USE_NEW_API) {
+      console.warn('🚫 Supabase forgotPassword called but Express API is enabled');
+      return { success: false, message: 'Use Express API for authentication' };
+    }
 
-    const result = await AuthAPI.resetPassword(data.email)
+    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+    const result = await AuthAPI.resetPassword(data.email);
+    setAuthState((prev) => ({ ...prev, isLoading: false }));
 
-    setAuthState((prev) => ({
-      ...prev,
-      isLoading: false,
-    }))
-
-    return { success: result.success, message: result.message }
-  }
+    return { success: result.success, message: result.message };
+  };
 
   const logout = async () => {
-    setAuthState((prev) => ({ ...prev, isLoading: true }))
+    if (USE_NEW_API) {
+      console.warn('🚫 Supabase logout called but Express API is enabled');
+      return;
+    }
 
-    await AuthAPI.logout()
-
+    setAuthState((prev) => ({ ...prev, isLoading: true }));
+    await AuthAPI.logout();
     setAuthState({
       user: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
-    })
-  }
+    });
+  };
 
   const clearError = () => {
-    setAuthState((prev) => ({ ...prev, error: null }))
-  }
+    setAuthState((prev) => ({ ...prev, error: null }));
+  };
 
-  return (
-    <SupabaseAuthContext.Provider
-      value={{
+  return React.createElement(
+    SupabaseAuthContext.Provider,
+    {
+      value: {
         authState,
         login,
         register,
         forgotPassword,
         logout,
         clearError,
-      }}
-    >
-      {children}
-    </SupabaseAuthContext.Provider>
-  )
+      }
+    },
+    children
+  );
 }
