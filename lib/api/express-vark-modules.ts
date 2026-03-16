@@ -80,11 +80,120 @@ export class ExpressVARKModulesAPI {
   }
 
   /**
-   * Fetch module content with hybrid approach:
-   * 1. Try backend redirect to R2 (fast, no memory)
-   * 2. If DNS fails, use backend proxy (slower but works everywhere)
+   * Fetch module content with optimized streaming approach for large files
    */
-  private async fetchModuleContent(moduleId: string, url: string): Promise<any> {
+  private async fetchModuleContentOptimized(moduleId: string, url: string): Promise<any> {
+    try {
+      console.log('📥 [OPTIMIZED] Fetching large module content for module:', moduleId);
+      console.log('📊 [OPTIMIZED] Content URL:', url);
+      
+      const startTime = Date.now();
+      
+      // Step 1: Check if content is cached in browser
+      const cacheKey = `module_content_${moduleId}`;
+      const cachedContent = localStorage.getItem(cacheKey);
+      const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+      
+      if (cachedContent && cacheTimestamp) {
+        const cacheAge = Date.now() - parseInt(cacheTimestamp);
+        const maxCacheAge = 5 * 60 * 1000; // 5 minutes
+        
+        if (cacheAge < maxCacheAge) {
+          console.log('✅ [OPTIMIZED] Using cached content (age:', Math.round(cacheAge / 1000), 'seconds)');
+          return JSON.parse(cachedContent);
+        } else {
+          console.log('⚠️ [OPTIMIZED] Cache expired, fetching fresh content');
+          localStorage.removeItem(cacheKey);
+          localStorage.removeItem(`${cacheKey}_timestamp`);
+        }
+      }
+      
+      // Step 2: Try backend redirect with streaming (primary method)
+      console.log('🔀 [OPTIMIZED] Attempting optimized fetch...');
+      try {
+        const response = await expressClient.get(`/api/modules/${moduleId}/content-optimized`);
+        
+        if (!response.error) {
+          const content = response.data || response;
+          
+          // Cache the content
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(content));
+            localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+            console.log('💾 [OPTIMIZED] Content cached for future use');
+          } catch (cacheError) {
+            console.warn('⚠️ [OPTIMIZED] Failed to cache content (too large for localStorage)');
+          }
+          
+          const fetchTime = Date.now() - startTime;
+          console.log(`✅ [OPTIMIZED] Optimized fetch completed in ${fetchTime}ms`);
+          return content;
+        }
+      } catch (optimizedError: any) {
+        console.warn('⚠️ [OPTIMIZED] Optimized fetch failed:', optimizedError.message);
+      }
+      
+      // Step 3: Fallback to original hybrid method
+      console.log('🔄 [OPTIMIZED] Falling back to original method...');
+      return await this.fetchModuleContentOriginal(moduleId, url);
+      
+    } catch (error) {
+      console.error('❌ [OPTIMIZED] All optimized fetch methods failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Stream large content with progress updates
+   */
+  private async streamLargeContent(response: Response): Promise<any> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength) : 0;
+    let loaded = 0;
+    const chunks: Uint8Array[] = [];
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        loaded += value.length;
+        
+        if (total > 0) {
+          const progress = Math.round((loaded / total) * 100);
+          console.log(`🌊 [STREAMING] Progress: ${progress}% (${Math.round(loaded / 1024 / 1024 * 100) / 100}MB / ${Math.round(total / 1024 / 1024 * 100) / 100}MB)`);
+        }
+      }
+      
+      // Combine chunks and parse JSON
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const combined = new Uint8Array(totalLength);
+      let offset = 0;
+      
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      const text = new TextDecoder().decode(combined);
+      return JSON.parse(text);
+      
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Original fetch method (fallback for optimized fetch)
+   */
+  private async fetchModuleContentOriginal(moduleId: string, url: string): Promise<any> {
     try {
       console.log('📥 [HYBRID] Fetching module content for module:', moduleId);
       
@@ -158,13 +267,13 @@ export class ExpressVARKModulesAPI {
 
       // If module has json_content_url, fetch and merge the full content
       if (module.json_content_url) {
-        console.log('📥 [GET MODULE] Module has json_content_url, fetching full content...');
+        console.log('📥 [GET MODULE] Module has json_content_url, fetching optimized content...');
         const contentStartTime = Date.now();
         
-        const fullContent = await this.fetchModuleContent(id, module.json_content_url);
+        const fullContent = await this.fetchModuleContentOptimized(id, module.json_content_url);
         
         const contentFetchTime = Date.now() - contentStartTime;
-        console.log(`📊 [GET MODULE] R2 content fetch took ${contentFetchTime}ms`);
+        console.log(`📊 [GET MODULE] Optimized content fetch took ${contentFetchTime}ms`);
         
         // Only merge if fetch was successful
         if (fullContent) {

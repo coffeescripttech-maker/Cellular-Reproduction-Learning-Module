@@ -76,6 +76,8 @@ interface VARKModuleBuilderProps {
   categories?: VARKModuleCategory[];
   teacherClasses?: Class[];
   availableModules?: VARKModule[];
+  saving?: boolean;
+  saveProgress?: number;
 }
 
 const learningStyleIcons = {
@@ -137,7 +139,9 @@ export default function VARKModuleBuilder({
   initialData,
   categories = [],
   teacherClasses = [],
-  availableModules = []
+  availableModules = [],
+  saving = false,
+  saveProgress = 0
 }: VARKModuleBuilderProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
