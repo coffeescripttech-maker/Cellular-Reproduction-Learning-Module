@@ -213,7 +213,7 @@ export class ExpressVARKModulesAPI {
       const hasLargeContent = data.content_structure?.sections && 
                               data.content_structure.sections.length > 0;
       
-      let createData = { ...data };
+      let createData: any = { ...data };
       
       if (hasLargeContent && typeof window !== 'undefined') {
         console.log('📤 Module has large content, uploading to R2 storage first...');
@@ -249,14 +249,10 @@ export class ExpressVARKModulesAPI {
           
           // NOW strip out large content fields to avoid 413 error
           // Only send metadata to backend
-          delete createData.content_structure;
-          delete createData.contentStructure;
-          delete createData.assessment_questions;
-          delete createData.assessmentQuestions;
-          delete createData.multimedia_content;
-          delete createData.multimediaContent;
-          delete createData.interactive_elements;
-          delete createData.interactiveElements;
+          if (createData.content_structure) delete createData.content_structure;
+          if (createData.assessment_questions) delete createData.assessment_questions;
+          if (createData.multimedia_content) delete createData.multimedia_content;
+          if (createData.interactive_elements) delete createData.interactive_elements;
           
           // Set the json_content_url so backend knows where to fetch full content
           createData.json_content_url = publicUrl;
@@ -302,18 +298,18 @@ export class ExpressVARKModulesAPI {
       console.log('📝 Updating VARK module:', id);
       
       // Strip out read-only fields that shouldn't be updated
-      const updateData = { ...data };
-      delete updateData.id;
-      delete updateData.created_by;
-      delete updateData.createdBy;
-      delete updateData.creator_name;
-      delete updateData.creatorName;
-      delete updateData.created_at;
-      delete updateData.createdAt;
-      delete updateData.updated_at;
-      delete updateData.updatedAt;
-      delete updateData.category_name;
-      delete updateData.categoryName;
+      const updateData: any = { ...data };
+      if (updateData.id) delete updateData.id;
+      if (updateData.created_by) delete updateData.created_by;
+      if (updateData.createdBy) delete updateData.createdBy;
+      if (updateData.creator_name) delete updateData.creator_name;
+      if (updateData.creatorName) delete updateData.creatorName;
+      if (updateData.created_at) delete updateData.created_at;
+      if (updateData.createdAt) delete updateData.createdAt;
+      if (updateData.updated_at) delete updateData.updated_at;
+      if (updateData.updatedAt) delete updateData.updatedAt;
+      if (updateData.category_name) delete updateData.category_name;
+      if (updateData.categoryName) delete updateData.categoryName;
 
       // Check if module has large content that should be stored in file storage
       const hasLargeContent = updateData.content_structure?.sections && 
@@ -350,14 +346,10 @@ export class ExpressVARKModulesAPI {
           
           // NOW strip out large content fields to avoid 413 error
           // Only send metadata to backend
-          delete updateData.content_structure;
-          delete updateData.contentStructure;
-          delete updateData.assessment_questions;
-          delete updateData.assessmentQuestions;
-          delete updateData.multimedia_content;
-          delete updateData.multimediaContent;
-          delete updateData.interactive_elements;
-          delete updateData.interactiveElements;
+          if (updateData.content_structure) delete updateData.content_structure;
+          if (updateData.assessment_questions) delete updateData.assessment_questions;
+          if (updateData.multimedia_content) delete updateData.multimedia_content;
+          if (updateData.interactive_elements) delete updateData.interactive_elements;
           
           // Set the json_content_url so backend knows where to fetch full content
           updateData.json_content_url = publicUrl;

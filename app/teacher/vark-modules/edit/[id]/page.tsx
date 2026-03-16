@@ -19,6 +19,7 @@ export default function EditVARKModulePage() {
   const [module, setModule] = useState<VARKModule | null>(null);
   const [availableModules, setAvailableModules] = useState<VARKModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingContent, setLoadingContent] = useState(false);
 
   const moduleId = params.id as string;
 
@@ -38,9 +39,11 @@ export default function EditVARKModulePage() {
       setAvailableModules(allModules);
       console.log('📚 Loaded', allModules.length, 'modules for prerequisite selection');
       
-      // Use fast loading for edit page - skip R2 content fetch initially
-      // We'll load the full content when the user actually starts editing
-      const moduleData = await expressVARKModulesAPI.getModuleById(moduleId, true); // skipContent = true
+      // For editing, we need the FULL content structure, so don't skip content
+      console.log('📥 Loading full module content for editing...');
+      setLoadingContent(true);
+      const moduleData = await expressVARKModulesAPI.getModuleById(moduleId, false); // skipContent = false
+      setLoadingContent(false);
       
       if (!moduleData) {
         toast.error('Module not found');
@@ -49,7 +52,7 @@ export default function EditVARKModulePage() {
       }
 
       // Allow any teacher to edit any module (collaborative editing)
-      console.log('✅ Module loaded for editing (fast mode):', moduleData.title);
+      console.log('✅ Module loaded for editing (full content):', moduleData.title);
       console.log('👤 Current user:', user?.id);
       console.log('👤 Module creator:', moduleData.created_by);
       console.log('📋 Module fields check:');
@@ -61,6 +64,19 @@ export default function EditVARKModulePage() {
       console.log('  - Difficulty Level:', moduleData.difficulty_level);
       console.log('  - Duration:', moduleData.estimated_duration_minutes, 'minutes');
       console.log('  - Has JSON Content URL:', !!moduleData.json_content_url);
+      
+      // Verify content structure is loaded
+      if (moduleData.content_structure?.sections?.length > 0) {
+        console.log('✅ Content structure loaded successfully');
+        console.log('📄 Section titles:', moduleData.content_structure.sections.map(s => s.title));
+      } else {
+        console.warn('⚠️ Content structure is empty or not loaded');
+        if (moduleData.json_content_url) {
+          console.log('🔄 Module has R2 content URL, content should have been fetched');
+        } else {
+          console.log('📝 Module has no R2 content URL, using database content');
+        }
+      }
       
       setModule(moduleData);
     } catch (error) {
@@ -107,7 +123,14 @@ export default function EditVARKModulePage() {
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              <p className="text-gray-600">Loading module...</p>
+              <p className="text-gray-600">
+                {loadingContent ? 'Loading module content...' : 'Loading module...'}
+              </p>
+              {loadingContent && (
+                <p className="text-sm text-gray-500">
+                  Fetching full content structure from storage...
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

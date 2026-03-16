@@ -26,7 +26,9 @@ import {
   Eye,
   Headphones,
   PenTool,
-  Zap
+  Zap,
+  Database,
+  Lightbulb
 } from 'lucide-react';
 import { VARKModule, VARKAssessmentQuestion } from '@/types/vark-module';
 
@@ -121,6 +123,140 @@ export default function AssessmentStep({
       setSelectedQuestionIndex(0);
     }
   }, [questions, selectedQuestionIndex]);
+
+  // Sample assessment questions for quick population
+  const sampleAssessmentQuestions: VARKAssessmentQuestion[] = [
+    {
+      id: 'sample-pre-test-1',
+      question: 'What is the main purpose of cell division?',
+      type: 'single_choice',
+      options: [
+        'A. Produce energy',
+        'B. Stop cell growth', 
+        'C. Create new cells for growth, repair, and reproduction',
+        'D. Eliminate old cells'
+      ],
+      correct_answer: 'C. Create new cells for growth, repair, and reproduction',
+      points: 10,
+      time_limit: 60,
+      hints: ['Think about why organisms need new cells', 'Consider growth and healing processes']
+    },
+    {
+      id: 'sample-pre-test-2',
+      question: 'Which type of cell division results in genetically identical daughter cells?',
+      type: 'single_choice',
+      options: [
+        'A. Mitosis',
+        'B. Fertilization',
+        'C. Binary fission', 
+        'D. Meiosis'
+      ],
+      correct_answer: 'A. Mitosis',
+      points: 10,
+      time_limit: 45,
+      hints: ['This process is used for growth and repair', 'The daughter cells have the same genetic material as the parent']
+    },
+    {
+      id: 'sample-pre-test-3',
+      question: 'During which phase of mitosis do chromosomes align at the cell center?',
+      type: 'single_choice',
+      options: [
+        'A. Prophase',
+        'B. Metaphase',
+        'C. Anaphase',
+        'D. Telophase'
+      ],
+      correct_answer: 'B. Metaphase',
+      points: 10,
+      time_limit: 45,
+      hints: ['Think about chromosome positioning', 'This phase comes after prophase']
+    },
+    {
+      id: 'sample-post-test-1',
+      question: 'What is the chromosome number in human gametes?',
+      type: 'single_choice',
+      options: ['A. 23', 'B. 92', 'C. 46', 'D. 12'],
+      correct_answer: 'A. 23',
+      points: 10,
+      time_limit: 30,
+      hints: ['Gametes are sex cells', 'They have half the chromosome number of body cells']
+    },
+    {
+      id: 'sample-post-test-2',
+      question: 'Which process produces genetic variation in offspring?',
+      type: 'single_choice',
+      options: [
+        'A. Mitosis',
+        'B. Meiosis',
+        'C. Binary fission',
+        'D. Budding'
+      ],
+      correct_answer: 'B. Meiosis',
+      points: 10,
+      time_limit: 45,
+      hints: ['This process creates sex cells', 'Crossing over occurs during this process']
+    },
+    {
+      id: 'sample-true-false-1',
+      question: 'Meiosis produces four genetically different gametes from one parent cell.',
+      type: 'true_false',
+      options: ['True', 'False'],
+      correct_answer: 'True',
+      points: 5,
+      time_limit: 20,
+      hints: ['Think about genetic variation', 'Consider crossing over and independent assortment']
+    },
+    {
+      id: 'sample-true-false-2',
+      question: 'Mitosis and meiosis both result in the same number of daughter cells.',
+      type: 'true_false',
+      options: ['True', 'False'],
+      correct_answer: 'False',
+      points: 5,
+      time_limit: 20,
+      hints: ['Count the daughter cells produced by each process', 'Mitosis produces 2, meiosis produces 4']
+    },
+    {
+      id: 'sample-multiple-choice-1',
+      question: 'Which of the following are phases of mitosis? (Select all that apply)',
+      type: 'multiple_choice',
+      options: [
+        'A. Prophase',
+        'B. Metaphase',
+        'C. Interphase',
+        'D. Anaphase',
+        'E. Telophase',
+        'F. Cytokinesis'
+      ],
+      correct_answer: 'A. Prophase, B. Metaphase, D. Anaphase, E. Telophase',
+      points: 15,
+      time_limit: 90,
+      hints: ['Interphase is not part of mitosis', 'Cytokinesis follows mitosis but is separate']
+    }
+  ];
+
+  const quickPopulateSampleAssessments = () => {
+    // Validate that all sample questions have correct answers
+    const validatedQuestions = sampleAssessmentQuestions.map(question => ({
+      ...question,
+      // Ensure correct_answer is properly set
+      correct_answer: question.correct_answer || question.options?.[0] || '',
+      // Ensure all required fields are present
+      points: question.points || 10,
+      time_limit: question.time_limit || 60
+    }));
+
+    updateFormData({ assessment_questions: validatedQuestions });
+    setSelectedQuestionIndex(0);
+    
+    console.log('✅ Sample assessments populated:', validatedQuestions);
+    console.log('📊 Total questions added:', validatedQuestions.length);
+    console.log('🎯 Questions with correct answers:', validatedQuestions.filter(q => q.correct_answer).length);
+    
+    // Show success message
+    const totalPoints = validatedQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
+    alert(`✅ Successfully populated ${validatedQuestions.length} sample assessment questions!\n\n📊 Total Points: ${totalPoints}\n🎯 Question Types: ${Array.from(new Set(validatedQuestions.map(q => q.type))).join(', ')}\n\n💡 All questions include correct answers and hints for students.`);
+  };
 
   const addQuestion = () => {
     const newQuestion: VARKAssessmentQuestion = {
@@ -276,15 +412,111 @@ export default function AssessmentStep({
         {/* Correct Answer */}
         <div>
           <Label className="text-sm font-medium text-gray-700">
-            Correct Answer
+            Correct Answer *
+            <span className="text-xs text-gray-500 ml-1">
+              (Required for grading)
+            </span>
+          </Label>
+          {(type === 'single_choice' || type === 'multiple_choice') && question.options && question.options.length > 0 ? (
+            <Select
+              value={question.correct_answer || ''}
+              onValueChange={value => updateQuestion(index, { correct_answer: value })}>
+              <SelectTrigger className={!question.correct_answer ? 'border-red-300' : ''}>
+                <SelectValue placeholder="Select the correct answer..." />
+              </SelectTrigger>
+              <SelectContent>
+                {question.options.map((option, optionIndex) => (
+                  <SelectItem key={optionIndex} value={option}>
+                    {option || `Option ${optionIndex + 1}`}
+                  </SelectItem>
+                ))}
+                {type === 'multiple_choice' && (
+                  <SelectItem value="multiple">
+                    Multiple correct answers (specify in text field below)
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          ) : type === 'true_false' ? (
+            <Select
+              value={question.correct_answer || ''}
+              onValueChange={value => updateQuestion(index, { correct_answer: value })}>
+              <SelectTrigger className={!question.correct_answer ? 'border-red-300' : ''}>
+                <SelectValue placeholder="Select True or False..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="True">True</SelectItem>
+                <SelectItem value="False">False</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              placeholder="Enter the correct answer..."
+              value={question.correct_answer || ''}
+              onChange={e =>
+                updateQuestion(index, { correct_answer: e.target.value })
+              }
+              className={!question.correct_answer ? 'border-red-300' : ''}
+            />
+          )}
+          {!question.correct_answer && (
+            <div className="flex items-center space-x-1 mt-1">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <p className="text-xs text-red-600">Correct answer is required for grading</p>
+            </div>
+          )}
+          {type === 'multiple_choice' && question.correct_answer === 'multiple' && (
+            <div className="mt-2">
+              <Input
+                placeholder="Enter multiple correct answers (e.g., A. Option 1, C. Option 3)"
+                value={question.correct_answer || ''}
+                onChange={e =>
+                  updateQuestion(index, { correct_answer: e.target.value })
+                }
+                className="text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                For multiple correct answers, list them separated by commas
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Time Limit */}
+        <div>
+          <Label className="text-sm font-medium text-gray-700">
+            Time Limit (seconds)
+            <span className="text-xs text-gray-500 ml-1">
+              (0 = no time limit)
+            </span>
           </Label>
           <Input
-            placeholder="Enter the correct answer..."
-            value={question.correct_answer || ''}
+            type="number"
+            min="0"
+            placeholder="0"
+            value={question.time_limit || ''}
             onChange={e =>
-              updateQuestion(index, { correct_answer: e.target.value })
+              updateQuestion(index, { time_limit: parseInt(e.target.value) || 0 })
             }
           />
+        </div>
+
+        {/* Hints */}
+        <div>
+          <Label className="text-sm font-medium text-gray-700">Hints</Label>
+          <Textarea
+            placeholder="Enter helpful hints for students (optional)..."
+            value={question.hints?.join('\n') || ''}
+            onChange={e =>
+              updateQuestion(index, { 
+                hints: e.target.value.split('\n').filter(hint => hint.trim()) 
+              })
+            }
+            className="min-h-[80px] resize-none"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter each hint on a new line
+          </p>
         </div>
 
         {/* Points */}
@@ -343,14 +575,27 @@ export default function AssessmentStep({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Assessment Questions</CardTitle>
-                <Button
-                  onClick={addQuestion}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Question
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={quickPopulateSampleAssessments}
+                    size="sm"
+                    variant="outline"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50">
+                    <Database className="w-4 h-4 mr-1" />
+                    Quick Populate Sample Assessments
+                  </Button>
+                  <Button
+                    onClick={addQuestion}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Question
+                  </Button>
+                </div>
               </div>
+              <p className="text-sm text-gray-600">
+                Choose a pre-made assessment to quickly populate questions
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -440,6 +685,54 @@ export default function AssessmentStep({
           )}
         </div>
       </div>
+
+      {/* Assessment Summary */}
+      {questions.length > 0 && (
+        <Card className="border-0 shadow-sm bg-blue-50">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2" />
+              Assessment Summary
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+              <div className="bg-white p-3 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {questions.length}
+                </div>
+                <div className="text-blue-800">Total Questions</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {questions.reduce((sum, q) => sum + (q.points || 0), 0)}
+                </div>
+                <div className="text-green-800">Total Points</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {questions.filter(q => q.correct_answer).length}
+                </div>
+                <div className="text-purple-800">With Answers</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {Array.from(new Set(questions.map(q => q.type))).length}
+                </div>
+                <div className="text-orange-800">Question Types</div>
+              </div>
+            </div>
+            <div className="mt-4 text-sm text-blue-800">
+              <strong>Question Types:</strong> {Array.from(new Set(questions.map(q => q.type))).join(', ')}
+            </div>
+            {questions.some(q => !q.correct_answer) && (
+              <div className="mt-2 p-2 bg-red-100 rounded-lg">
+                <p className="text-sm text-red-800">
+                  ⚠️ {questions.filter(q => !q.correct_answer).length} question(s) missing correct answers
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Assessment Tips */}
       <Card className="border-0 shadow-sm bg-green-50">

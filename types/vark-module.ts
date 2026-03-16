@@ -391,6 +391,8 @@ export interface VARKAssessmentQuestion {
   correct_answer?: any;
   max_duration?: number; // For audio/visual responses
   points?: number;
+  time_limit?: number; // Time limit in seconds (0 = no limit)
+  hints?: string[]; // Array of hints for students
   interactive_config?: any; // For interactive questions
 }
 
