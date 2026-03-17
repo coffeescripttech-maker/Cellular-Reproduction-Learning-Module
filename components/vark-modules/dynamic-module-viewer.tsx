@@ -267,9 +267,13 @@ export default function DynamicModuleViewer({
   const currentSection =
     memoizedSections[previewMode ? activeSectionIndex : currentSectionIndex];
   const totalSections = memoizedSections.length;
-  const completedSections =
-    Object.values(sectionProgress).filter(Boolean).length;
-  const progressPercentage = (completedSections / totalSections) * 100;
+  
+  // Only count completed sections that are actually visible to the student
+  const completedSections = memoizedSections.filter(section => 
+    sectionProgress[section.id] === true
+  ).length;
+  
+  const progressPercentage = totalSections > 0 ? (completedSections / totalSections) * 100 : 0;
 
   // Memoize quiz options to prevent unnecessary re-renders
   const memoizedQuizOptions = useMemo(() => {
@@ -4384,6 +4388,24 @@ export default function DynamicModuleViewer({
 
   // ✅ CHECK FOR MODULE COMPLETION
   useEffect(() => {
+    // Debug logging for completion logic
+    console.log('🔍 === COMPLETION CHECK ===');
+    console.log('Total sections (visible):', totalSections);
+    console.log('Completed sections (visible):', completedSections);
+    console.log('All section progress:', sectionProgress);
+    console.log('Memoized sections:', memoizedSections.map(s => ({ id: s.id, title: s.title })));
+    console.log('Preview mode:', previewMode);
+    console.log('Has shown completion:', hasShownCompletion);
+    console.log('User ID:', userId);
+    console.log('Should trigger completion:', 
+      !previewMode &&
+      !hasShownCompletion &&
+      completedSections === totalSections &&
+      totalSections > 0 &&
+      userId
+    );
+    console.log('🔍 === END COMPLETION CHECK ===');
+
     if (
       !previewMode &&
       !hasShownCompletion &&
@@ -4393,6 +4415,7 @@ export default function DynamicModuleViewer({
     ) {
       // Small delay to ensure all state is updated
       const timer = setTimeout(() => {
+        console.log('🎉 Triggering module completion!');
         handleModuleCompletion();
       }, 1000);
 
