@@ -596,12 +596,12 @@ export default function StudentDashboard() {
                               </p>
                               {activity.score !== undefined && (
                                 <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
-                                  {activity.score.toFixed(1)}%
+                                  {typeof activity.score === 'number' ? activity.score.toFixed(1) : activity.score}%
                                 </Badge>
                               )}
                               {activity.progress !== undefined && (
                                 <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                                  {activity.progress.toFixed(0)}% done
+                                  {typeof activity.progress === 'number' ? activity.progress.toFixed(0) : activity.progress}% done
                                 </Badge>
                               )}
                             </div>
