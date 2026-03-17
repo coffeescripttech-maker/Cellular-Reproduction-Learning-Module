@@ -106,9 +106,15 @@ export default function ReviewStep({ formData, onSave }: ReviewStepProps) {
       // if (!section.title) issues.push(`Section ${index + 1} title is required`);
 
       // ✅ Check for any type of content (CKEditor uses simple text field)
+      // Ensure text is a string before calling trim()
+      const textContent = section.content_data?.text;
+      const hasTextContent = typeof textContent === 'string' && textContent.trim().length > 0;
+      
+      const promptContent = section.content_data?.prompt;
+      const hasPromptContent = typeof promptContent === 'string' && promptContent.trim().length > 0;
+      
       const hasContent =
-        (section.content_data?.text &&
-          section.content_data.text.trim().length > 0) ||
+        hasTextContent ||
         section.content_data?.table_data ||
         section.content_data?.quiz_data ||
         section.content_data?.activity_data ||
@@ -118,8 +124,7 @@ export default function ReviewStep({ formData, onSave }: ReviewStepProps) {
         section.content_data?.diagram_data ||
         section.content_data?.interactive_data ||
         section.content_data?.read_aloud_data ||
-        (section.content_data?.prompt &&
-          section.content_data.prompt.trim().length > 0);
+        hasPromptContent;
 
       if (!hasContent) {
         issues.push(`Section ${index + 1} content is required`);

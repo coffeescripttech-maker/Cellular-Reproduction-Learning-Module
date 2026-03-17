@@ -49,23 +49,43 @@ interface CKEditorContentEditorProps {
   onChange: (data: string) => void;
   placeholder?: string;
   readOnly?: boolean;
+  moduleId?: string; // Add moduleId for R2 upload context
+  useR2Upload?: boolean; // Toggle between R2 and base64 upload
 }
 
 const CKEditorContentEditor: React.FC<CKEditorContentEditorProps> = ({
   data,
   onChange,
   placeholder = 'Start writing your content...',
-  readOnly = false
+  readOnly = false,
+  moduleId,
+  useR2Upload = false // Default to false to avoid breaking existing functionality
 }) => {
   const editorRef = useRef<any>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [r2UploadPlugin, setR2UploadPlugin] = useState<any>(null);
 
   console.log('🎯 CKEditor Component Mounted:', {
     hasData: !!data,
     dataLength: data?.length || 0,
-    dataPreview: data?.substring(0, 100) || '(empty)',
-    readOnly
+    dataType: typeof data,
+    readOnly,
+    moduleId,
+    useR2Upload
   });
+
+  // Load R2 upload adapter dynamically if needed
+  useEffect(() => {
+    if (useR2Upload && !r2UploadPlugin) {
+      import('@/lib/ckeditor-r2-upload-adapter')
+        .then(({ R2UploadAdapterPlugin }) => {
+          setR2UploadPlugin(() => (editor: any) => R2UploadAdapterPlugin(editor, moduleId));
+        })
+        .catch((error) => {
+          console.warn('⚠️ Failed to load R2 upload adapter, falling back to base64:', error);
+        });
+    }
+  }, [useR2Upload, moduleId]);
 
   // Debounced onChange handler to prevent excessive re-renders
   const debouncedOnChange = useCallback((content: string) => {
@@ -119,6 +139,7 @@ const CKEditorContentEditor: React.FC<CKEditorContentEditorProps> = ({
             ImageStyle,
             ImageToolbar,
             ImageUpload,
+            // Always include Base64UploadAdapter as fallback
             Base64UploadAdapter,
             Table,
             TableToolbar,
@@ -136,6 +157,10 @@ const CKEditorContentEditor: React.FC<CKEditorContentEditorProps> = ({
             GeneralHtmlSupport,
             SourceEditing
           ],
+          // Add R2 upload adapter if enabled and loaded
+          ...(useR2Upload && r2UploadPlugin && {
+            extraPlugins: [r2UploadPlugin]
+          }),
           toolbar: {
             items: [
               'undo',

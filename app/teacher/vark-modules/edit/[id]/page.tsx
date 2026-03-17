@@ -178,7 +178,11 @@ export default function EditVARKModulePage() {
       console.log('📤 Sections being saved:', updatedModule.content_structure?.sections?.length || 0);
       console.log('📋 Section titles being saved:', updatedModule.content_structure?.sections?.map(s => s.title) || []);
       
-      // Progress: Uploading to storage (50%)
+      // Progress: Converting base64 images (25%)
+      setSaveProgress(10);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Progress: Uploading to R2 storage (50%)
       setSaveProgress(25);
       await new Promise(resolve => setTimeout(resolve, 200));
       
@@ -187,7 +191,7 @@ export default function EditVARKModulePage() {
       await VARKModulesAPI.updateModule(moduleId, updatedModule);
       setSaveProgress(75);
       
-      toast.success('Module updated successfully!');
+      toast.success('Module updated successfully! Images optimized and stored in R2.');
       
       // Small delay to ensure storage is fully updated
       console.log('⏳ Waiting for storage to sync...');

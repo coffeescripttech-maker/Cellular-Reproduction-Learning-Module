@@ -619,6 +619,8 @@ export default function ContentStructureStep({
             <CKEditorContentEditor
               key={section.id}
               data={section.content_data?.text || ''}
+              moduleId={formData.id}
+              useR2Upload={false}
               onChange={(content) => {
                 console.log(`💾 Auto-saving Section ${index + 1}:`, {
                   sectionId: section.id,
@@ -4856,6 +4858,8 @@ export default function ContentStructureStep({
                     <CKEditorContentEditor
                       key={`experiment-instructions-${section.id}`}
                       data={section.content_data?.activity_data?.detailed_instructions || ''}
+                      moduleId={formData.id}
+                      useR2Upload={false}
                       onChange={(content) => {
                         updateContentSection(index, {
                           content_data: {
@@ -5986,6 +5990,8 @@ export default function ContentStructureStep({
                 <CKEditorContentEditor
                   key={`read-aloud-${section.id}`}
                   data={section.content_data?.read_aloud_data?.content || ''}
+                  moduleId={formData.id}
+                  useR2Upload={false}
                   onChange={(data) =>
                     updateContentSection(index, {
                       content_data: {
@@ -6654,9 +6660,7 @@ export default function ContentStructureStep({
                           console.log(`📂 Loading Section ${index + 1}:`, {
                             sectionId: section.id,
                             title: section.title || `Section ${index + 1}`,
-                            hasText: !!section.content_data?.text,
-                            textLength: section.content_data?.text?.length || 0,
-                            textPreview: section.content_data?.text?.substring(0, 100) || '(empty)'
+                            contentType: section.content_type
                           });
                           setSelectedSectionIndex(index);
                         }}>

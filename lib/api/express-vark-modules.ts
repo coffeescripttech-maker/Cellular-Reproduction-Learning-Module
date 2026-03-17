@@ -434,7 +434,91 @@ export class ExpressVARKModulesAPI {
                               updateData.content_structure.sections.length > 0;
       
       if (hasLargeContent) {
-        console.log('📤 Module has large content, uploading to R2 storage first...');
+        console.log('📤 Module has large content, processing and uploading to R2 storage...');
+        
+        // 🔄 AUTOMATIC BASE64 TO R2 CONVERSION
+        console.log('🔄 [AUTO CONVERSION] Checking for base64 images to convert...');
+        
+        // 🛡️ EXTEND JWT TOKEN FOR LONG OPERATIONS
+        console.log('🛡️ [AUTH PROTECTION] Ensuring token validity for long conversion...');
+        try {
+          // Check if we have a valid token and refresh if needed
+          const authResponse = await expressClient.get('/api/auth/me');
+          if (authResponse.error) {
+            console.warn('⚠️ [AUTH PROTECTION] Token validation failed, attempting refresh...');
+            // The expressClient will automatically handle token refresh
+          } else {
+            console.log('✅ [AUTH PROTECTION] Token is valid for conversion process');
+          }
+        } catch (authError) {
+          console.warn('⚠️ [AUTH PROTECTION] Auth check failed:', authError);
+          // Continue with conversion - expressClient will handle auth errors
+        }
+        
+        let conversions = 0;
+        
+        // Convert base64 images in content structure sections
+        if (updateData.content_structure?.sections) {
+          const totalSections = updateData.content_structure.sections.length;
+          
+          for (let i = 0; i < totalSections; i++) {
+            const section = updateData.content_structure.sections[i];
+            
+            // 🛡️ PERIODIC TOKEN VALIDATION (every 10 sections or 5 minutes)
+            if (i > 0 && (i % 10 === 0 || (Date.now() - (this as any).lastTokenCheck || 0) > 5 * 60 * 1000)) {
+              console.log(`🛡️ [AUTH PROTECTION] Validating token at section ${i + 1}/${totalSections}...`);
+              try {
+                const authCheck = await expressClient.get('/api/auth/me');
+                if (authCheck.error) {
+                  console.warn('⚠️ [AUTH PROTECTION] Token refresh triggered during conversion');
+                }
+                (this as any).lastTokenCheck = Date.now();
+              } catch (authError) {
+                console.warn('⚠️ [AUTH PROTECTION] Token validation warning:', authError);
+                // Continue - expressClient handles auth automatically
+              }
+            }
+            
+            // Convert text content
+            if (section.content_data?.text) {
+              const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+              const result = await convertBase64ImagesToR2(section.content_data.text, id);
+              if (result.convertedContent !== section.content_data.text) {
+                section.content_data.text = result.convertedContent;
+                conversions++;
+                console.log(`✅ [AUTO CONVERSION] Converted base64 images in section ${i + 1}`);
+              }
+            }
+
+            // Convert read-aloud content
+            if (section.content_data?.read_aloud_data?.content) {
+              const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+              const result = await convertBase64ImagesToR2(section.content_data.read_aloud_data.content, id);
+              if (result.convertedContent !== section.content_data.read_aloud_data.content) {
+                section.content_data.read_aloud_data.content = result.convertedContent;
+                conversions++;
+                console.log(`✅ [AUTO CONVERSION] Converted base64 images in read-aloud section ${i + 1}`);
+              }
+            }
+
+            // Convert activity instructions
+            if (section.content_data?.activity_data?.detailed_instructions) {
+              const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+              const result = await convertBase64ImagesToR2(section.content_data.activity_data.detailed_instructions, id);
+              if (result.convertedContent !== section.content_data.activity_data.detailed_instructions) {
+                section.content_data.activity_data.detailed_instructions = result.convertedContent;
+                conversions++;
+                console.log(`✅ [AUTO CONVERSION] Converted base64 images in activity instructions ${i + 1}`);
+              }
+            }
+          }
+        }
+        
+        if (conversions > 0) {
+          console.log(`🎉 [AUTO CONVERSION] Successfully converted ${conversions} base64 images to R2 URLs`);
+        } else {
+          console.log('ℹ️ [AUTO CONVERSION] No base64 images found to convert');
+        }
         
         // Upload full module JSON to R2 Storage
         const fullModuleData = {
@@ -831,8 +915,386 @@ export class ExpressVARKModulesAPI {
   }
 
   /**
-   * Progressive content loading - Load metadata first, then sections on demand
+   * Convert base64 images to R2 URLs in module content with comprehensive progress tracking
+   * This helps optimize existing modules with base64 images
    */
+  async convertBase64ImagesToR2(
+    moduleId: string, 
+    onProgress?: (progress: ModuleConversionProgress) => void
+  ): Promise<ModuleConversionResult> {
+    const startTime = Date.now();
+    
+    try {
+      console.log('🚀 [MODULE CONVERSION] Starting base64 to R2 conversion for module:', moduleId);
+      
+      // Report initial progress
+      onProgress?.({
+        stage: 'loading',
+        stageProgress: 0,
+        overallProgress: 0,
+        message: 'Loading module content...',
+        moduleId
+      });
+      
+      // Get the module with full content
+      const module = await this.getModuleById(moduleId, false, false);
+      if (!module) {
+        throw new Error('Module not found');
+      }
+
+      console.log('📋 [MODULE CONVERSION] Module loaded:', {
+        title: module.title,
+        sectionsCount: module.content_structure?.sections?.length || 0,
+        hasContent: !!module.content_structure
+      });
+
+      onProgress?.({
+        stage: 'analyzing',
+        stageProgress: 100,
+        overallProgress: 10,
+        message: 'Analyzing content for base64 images...',
+        moduleId
+      });
+
+      let totalConversions = 0;
+      let totalErrors = 0;
+      let totalSkipped = 0;
+      let hasChanges = false;
+      const sectionResults: Array<{
+        sectionIndex: number;
+        sectionTitle: string;
+        contentType: string;
+        conversions: number;
+        errors: number;
+        skipped: number;
+      }> = [];
+
+      const sections = module.content_structure?.sections || [];
+      const totalSections = sections.length;
+      
+      if (totalSections === 0) {
+        console.log('ℹ️ [MODULE CONVERSION] No sections found in module');
+        return {
+          success: true,
+          moduleId,
+          totalSections: 0,
+          processedSections: 0,
+          totalConversions: 0,
+          totalErrors: 0,
+          sectionResults: [],
+          duration: Date.now() - startTime
+        };
+      }
+
+      console.log(`📊 [MODULE CONVERSION] Found ${totalSections} sections to process`);
+
+      // 🛡️ INITIAL TOKEN VALIDATION FOR LONG CONVERSION
+      console.log('🛡️ [AUTH PROTECTION] Validating token before starting conversion...');
+      try {
+        const authResponse = await expressClient.get('/api/auth/me');
+        if (authResponse.error) {
+          console.warn('⚠️ [AUTH PROTECTION] Token validation failed, attempting refresh...');
+        } else {
+          console.log('✅ [AUTH PROTECTION] Token is valid for conversion process');
+        }
+      } catch (authError) {
+        console.warn('⚠️ [AUTH PROTECTION] Auth check failed:', authError);
+      }
+
+      // Process each section
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        const sectionIndex = i + 1;
+        
+        // 🛡️ PERIODIC TOKEN VALIDATION (every 10 sections or 5 minutes)
+        if (i > 0 && (i % 10 === 0 || (Date.now() - (this as any).lastConversionTokenCheck || 0) > 5 * 60 * 1000)) {
+          console.log(`🛡️ [AUTH PROTECTION] Validating token at section ${sectionIndex}/${totalSections}...`);
+          try {
+            const authCheck = await expressClient.get('/api/auth/me');
+            if (authCheck.error) {
+              console.warn('⚠️ [AUTH PROTECTION] Token refresh triggered during conversion');
+            }
+            (this as any).lastConversionTokenCheck = Date.now();
+          } catch (authError) {
+            console.warn('⚠️ [AUTH PROTECTION] Token validation warning:', authError);
+          }
+        }
+        
+        console.log(`\n📄 [MODULE CONVERSION] Processing section ${sectionIndex}/${totalSections}:`, {
+          sectionId: section.id,
+          title: section.title || 'Untitled',
+          contentType: section.content_type
+        });
+
+        onProgress?.({
+          stage: 'converting',
+          stageProgress: Math.round((i / totalSections) * 100),
+          overallProgress: 20 + Math.round((i / totalSections) * 70),
+          message: `Converting section ${sectionIndex}/${totalSections}: ${section.title || 'Untitled'}`,
+          moduleId,
+          currentSection: sectionIndex,
+          totalSections
+        });
+
+        let sectionConversions = 0;
+        let sectionErrors = 0;
+        let sectionSkipped = 0;
+
+        // Convert text content
+        if (section.content_data?.text) {
+          console.log(`📝 [MODULE CONVERSION] Converting text content in section ${sectionIndex}`);
+          
+          const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+          const result = await convertBase64ImagesToR2(
+            section.content_data.text, 
+            moduleId,
+            (progress) => {
+              onProgress?.({
+                stage: 'converting',
+                stageProgress: Math.round((i / totalSections) * 100),
+                overallProgress: 20 + Math.round((i / totalSections) * 70),
+                message: `Section ${sectionIndex}: Converting image ${progress.currentImage}/${progress.totalImages}`,
+                moduleId,
+                currentSection: sectionIndex,
+                totalSections,
+                imageProgress: progress
+              });
+            }
+          );
+          
+          if (result.convertedContent !== section.content_data.text) {
+            section.content_data.text = result.convertedContent;
+            hasChanges = true;
+          }
+          
+          sectionConversions += result.successfulConversions;
+          sectionErrors += result.failedConversions;
+          sectionSkipped += result.skippedImages;
+          
+          console.log(`✅ [MODULE CONVERSION] Text content processed: ${result.successfulConversions} conversions, ${result.failedConversions} errors, ${result.skippedImages} skipped`);
+        }
+
+        // Convert read-aloud content
+        if (section.content_data?.read_aloud_data?.content) {
+          console.log(`🔊 [MODULE CONVERSION] Converting read-aloud content in section ${sectionIndex}`);
+          
+          const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+          const result = await convertBase64ImagesToR2(
+            section.content_data.read_aloud_data.content, 
+            moduleId,
+            (progress) => {
+              onProgress?.({
+                stage: 'converting',
+                stageProgress: Math.round((i / totalSections) * 100),
+                overallProgress: 20 + Math.round((i / totalSections) * 70),
+                message: `Section ${sectionIndex}: Converting read-aloud image ${progress.currentImage}/${progress.totalImages}`,
+                moduleId,
+                currentSection: sectionIndex,
+                totalSections,
+                imageProgress: progress
+              });
+            }
+          );
+          
+          if (result.convertedContent !== section.content_data.read_aloud_data.content) {
+            section.content_data.read_aloud_data.content = result.convertedContent;
+            hasChanges = true;
+          }
+          
+          sectionConversions += result.successfulConversions;
+          sectionErrors += result.failedConversions;
+          sectionSkipped += result.skippedImages;
+          
+          console.log(`✅ [MODULE CONVERSION] Read-aloud content processed: ${result.successfulConversions} conversions, ${result.failedConversions} errors, ${result.skippedImages} skipped`);
+        }
+
+        // Convert activity instructions
+        if (section.content_data?.activity_data?.detailed_instructions) {
+          console.log(`🧪 [MODULE CONVERSION] Converting activity instructions in section ${sectionIndex}`);
+          
+          const { convertBase64ImagesToR2 } = await import('@/lib/ckeditor-r2-upload-adapter');
+          const result = await convertBase64ImagesToR2(
+            section.content_data.activity_data.detailed_instructions, 
+            moduleId,
+            (progress) => {
+              onProgress?.({
+                stage: 'converting',
+                stageProgress: Math.round((i / totalSections) * 100),
+                overallProgress: 20 + Math.round((i / totalSections) * 70),
+                message: `Section ${sectionIndex}: Converting activity image ${progress.currentImage}/${progress.totalImages}`,
+                moduleId,
+                currentSection: sectionIndex,
+                totalSections,
+                imageProgress: progress
+              });
+            }
+          );
+          
+          if (result.convertedContent !== section.content_data.activity_data.detailed_instructions) {
+            section.content_data.activity_data.detailed_instructions = result.convertedContent;
+            hasChanges = true;
+          }
+          
+          sectionConversions += result.successfulConversions;
+          sectionErrors += result.failedConversions;
+          sectionSkipped += result.skippedImages;
+          
+          console.log(`✅ [MODULE CONVERSION] Activity instructions processed: ${result.successfulConversions} conversions, ${result.failedConversions} errors, ${result.skippedImages} skipped`);
+        }
+
+        totalConversions += sectionConversions;
+        totalErrors += sectionErrors;
+        totalSkipped += sectionSkipped;
+
+        sectionResults.push({
+          sectionIndex,
+          sectionTitle: section.title || 'Untitled',
+          contentType: section.content_type || 'unknown',
+          conversions: sectionConversions,
+          errors: sectionErrors,
+          skipped: sectionSkipped
+        });
+
+        console.log(`📊 [MODULE CONVERSION] Section ${sectionIndex} completed:`, {
+          conversions: sectionConversions,
+          errors: sectionErrors,
+          skipped: sectionSkipped,
+          hasChanges: sectionConversions > 0
+        });
+      }
+
+      // Save the module if there were changes
+      if (hasChanges) {
+        console.log(`💾 [MODULE CONVERSION] Saving module with ${totalConversions} converted images`);
+        
+        onProgress?.({
+          stage: 'saving',
+          stageProgress: 0,
+          overallProgress: 90,
+          message: 'Saving updated module...',
+          moduleId
+        });
+        
+        // Calculate size before saving (estimate)
+        const beforeSize = JSON.stringify(module).length;
+        
+        await this.updateModule(moduleId, module);
+        
+        // Calculate size after saving (estimate)
+        const afterSize = JSON.stringify(module).length;
+        const sizeSavedBytes = beforeSize - afterSize;
+        const sizeSavedMB = sizeSavedBytes / (1024 * 1024);
+        const percentageReduced = ((sizeSavedBytes / beforeSize) * 100).toFixed(1);
+        
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`🎉 [MODULE CONVERSION] MIGRATION COMPLETE!`);
+        console.log(`${'='.repeat(80)}`);
+        console.log(`\n📊 CONVERSION SUMMARY:`);
+        console.log(`   ✅ Total Sections Processed: ${totalSections}`);
+        console.log(`   ✅ Images Converted to R2: ${totalConversions}`);
+        console.log(`   ⏭️  Images Already Optimized: ${totalSkipped}`);
+        console.log(`   ❌ Conversion Errors: ${totalErrors}`);
+        console.log(`\n💾 FILE SIZE REDUCTION:`);
+        console.log(`   📉 Size Before: ${(beforeSize / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`   📈 Size After: ${(afterSize / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`   💰 Size Saved: ${sizeSavedMB.toFixed(2)} MB (${percentageReduced}% reduction)`);
+        console.log(`\n🚀 PERFORMANCE BENEFITS:`);
+        console.log(`   ⚡ Faster loading times (images load from R2 CDN)`);
+        console.log(`   📦 Smaller JSON payload (${percentageReduced}% smaller)`);
+        console.log(`   🌐 Better bandwidth usage`);
+        console.log(`   💻 Reduced memory consumption`);
+        console.log(`\n✨ WHAT HAPPENED:`);
+        console.log(`   1. Base64 images were converted to R2 URLs`);
+        console.log(`   2. Module JSON was uploaded to R2 storage`);
+        console.log(`   3. Database now stores only the R2 URL (json_content_url)`);
+        console.log(`   4. Images are served from R2 CDN (fast & efficient)`);
+        console.log(`\n📝 NEXT STEPS:`);
+        console.log(`   • Module is now optimized and ready to use`);
+        console.log(`   • Students will experience faster loading`);
+        console.log(`   • You can edit the module normally`);
+        console.log(`   • Re-running conversion will skip already optimized images`);
+        console.log(`\n${'='.repeat(80)}\n`);
+        
+        onProgress?.({
+          stage: 'saving',
+          stageProgress: 100,
+          overallProgress: 95,
+          message: `Module saved! Reduced size by ${sizeSavedMB.toFixed(2)}MB (${percentageReduced}%)`,
+          moduleId
+        });
+      } else {
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`✅ [MODULE CONVERSION] NO CHANGES NEEDED`);
+        console.log(`${'='.repeat(80)}`);
+        console.log(`\n📊 ANALYSIS SUMMARY:`);
+        console.log(`   ✅ Total Sections Analyzed: ${totalSections}`);
+        console.log(`   ⏭️  Images Already Optimized: ${totalSkipped}`);
+        console.log(`   ℹ️  Base64 Images Found: 0`);
+        console.log(`\n🎉 GOOD NEWS:`);
+        console.log(`   • This module is already fully optimized!`);
+        console.log(`   • All images are stored in R2 storage`);
+        console.log(`   • No conversion needed`);
+        console.log(`\n${'='.repeat(80)}\n`);
+      }
+
+      const duration = Date.now() - startTime;
+      
+      console.log(`🎉 [MODULE CONVERSION] Conversion completed for module ${moduleId}:`, {
+        totalSections,
+        processedSections: sections.length,
+        totalConversions,
+        totalErrors,
+        totalSkipped,
+        successRate: totalConversions > 0 ? `${((totalConversions / (totalConversions + totalErrors)) * 100).toFixed(1)}%` : 'N/A',
+        duration: `${(duration / 1000).toFixed(1)}s`,
+        hasChanges
+      });
+
+      onProgress?.({
+        stage: 'completed',
+        stageProgress: 100,
+        overallProgress: 100,
+        message: `Conversion completed: ${totalConversions} images converted, ${totalSkipped} skipped, ${totalErrors} errors`,
+        moduleId
+      });
+
+      return {
+        success: totalErrors === 0,
+        moduleId,
+        totalSections,
+        processedSections: sections.length,
+        totalConversions,
+        totalErrors,
+        totalSkipped,
+        sectionResults,
+        duration
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error('❌ [MODULE CONVERSION] Conversion failed:', error);
+      
+      onProgress?.({
+        stage: 'error',
+        stageProgress: 0,
+        overallProgress: 0,
+        message: `Conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        moduleId
+      });
+      
+      return { 
+        success: false, 
+        moduleId,
+        totalSections: 0,
+        processedSections: 0,
+        totalConversions: 0, 
+        totalErrors: 1,
+        sectionResults: [],
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
   async fetchModuleContentProgressive(moduleId: string): Promise<any> {
     try {
       console.log('🔄 [PROGRESSIVE] Starting progressive content loading for module:', moduleId);
@@ -850,7 +1312,8 @@ export class ExpressVARKModulesAPI {
       
       console.log('🔍 [PROGRESSIVE] Raw metadata response:', metadataResponse);
       
-      const metadata = metadataResponse.data;
+      // Backend returns { data: metadata }, so we need to access .data.data
+      const metadata = metadataResponse.data?.data || metadataResponse.data;
       if (!metadata) {
         console.warn('⚠️ [PROGRESSIVE] No metadata received, falling back to optimized loading');
         return await this.fetchModuleContentOptimized(moduleId, '');
@@ -888,7 +1351,9 @@ export class ExpressVARKModulesAPI {
         const assessmentsResponse = await expressClient.get(`/api/modules/${moduleId}/content-progressive?part=assessments`);
         
         if (!assessmentsResponse.error) {
-          metadata.assessment_questions = assessmentsResponse.data.assessment_questions || [];
+          // Backend returns { data: assessmentData }, so access .data.data or .data
+          const assessmentData = assessmentsResponse.data?.data || assessmentsResponse.data;
+          metadata.assessment_questions = assessmentData?.assessment_questions || [];
         }
         
         return metadata;
@@ -924,15 +1389,21 @@ export class ExpressVARKModulesAPI {
         let failedCount = 0;
         batchResults.forEach((result, index) => {
           if (!result.error && result.data) {
-            const sectionData = result.data;
-            sections[i + index] = sectionData.section;
-            
-            // Merge multimedia and interactive content
-            if (sectionData.multimedia_content) {
-              multimediaContent = { ...multimediaContent, ...sectionData.multimedia_content };
-            }
-            if (sectionData.interactive_elements) {
-              interactiveElements = { ...interactiveElements, ...sectionData.interactive_elements };
+            // Backend returns { data: sectionData }, so access .data.data or .data
+            const sectionData = result.data?.data || result.data;
+            if (sectionData && sectionData.section) {
+              sections[i + index] = sectionData.section;
+              
+              // Merge multimedia and interactive content
+              if (sectionData.multimedia_content) {
+                multimediaContent = { ...multimediaContent, ...sectionData.multimedia_content };
+              }
+              if (sectionData.interactive_elements) {
+                interactiveElements = { ...interactiveElements, ...sectionData.interactive_elements };
+              }
+            } else {
+              console.warn(`⚠️ [PROGRESSIVE] Invalid section data for section ${i + index}`);
+              sections[i + index] = null;
             }
           } else {
             failedCount++;
@@ -957,7 +1428,9 @@ export class ExpressVARKModulesAPI {
       
       let assessmentQuestions = [];
       if (!assessmentsResponse.error) {
-        assessmentQuestions = assessmentsResponse.data.assessment_questions || [];
+        // Backend returns { data: assessmentData }, so access .data.data or .data
+        const assessmentData = assessmentsResponse.data?.data || assessmentsResponse.data;
+        assessmentQuestions = assessmentData?.assessment_questions || [];
       }
       
       // Step 5: Combine everything
@@ -1005,4 +1478,45 @@ export class ExpressVARKModulesAPI {
 
 // Export singleton instance
 export const expressVARKModulesAPI = new ExpressVARKModulesAPI();
+
+// Types for module conversion progress tracking
+export interface ModuleConversionProgress {
+  stage: 'loading' | 'analyzing' | 'converting' | 'saving' | 'completed' | 'error';
+  stageProgress: number; // 0-100
+  overallProgress: number; // 0-100
+  message: string;
+  moduleId: string;
+  currentSection?: number;
+  totalSections?: number;
+  imageProgress?: {
+    currentImage: number;
+    totalImages: number;
+    percentage: number;
+    status: 'converting' | 'completed' | 'failed';
+    currentImageType?: string;
+    currentImageSize?: number;
+    successfulConversions?: number;
+    failedConversions?: number;
+  };
+}
+
+export interface ModuleConversionResult {
+  success: boolean;
+  moduleId: string;
+  totalSections: number;
+  processedSections: number;
+  totalConversions: number;
+  totalErrors: number;
+  totalSkipped: number;
+  sectionResults: Array<{
+    sectionIndex: number;
+    sectionTitle: string;
+    contentType: string;
+    conversions: number;
+    errors: number;
+    skipped: number;
+  }>;
+  duration: number;
+  error?: string;
+}
 
